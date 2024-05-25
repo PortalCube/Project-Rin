@@ -21,9 +21,8 @@ export function registerVisibilityChangeEvent() {
 export function registerResizeEvent() {
     window.addEventListener("resize", () => {
         if (Rin.camera && Rin.renderer) {
-            const element = Rin.renderer.domElement;
-            const width = element.innerWidth;
-            const height = element.innerHeight;
+            const width = window.innerWidth;
+            const height = window.innerHeight;
 
             Rin.camera.aspect = width / height;
             Rin.camera.updateProjectionMatrix();

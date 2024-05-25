@@ -40,8 +40,8 @@ export const Rin = {
  * @param {HTMLCanvasElement} canvas
  */
 export function createScene(canvas) {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const width = window.clientWidth;
+    const height = window.clientHeight;
 
     const ratio = width / height;
 
