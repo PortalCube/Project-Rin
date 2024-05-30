@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 // 엔진 메인 객체
-export const Rin = {
+export const RinEngine = {
     // Three.js Variables
     scene: null,
     renderer: null,
@@ -45,13 +45,13 @@ export function createScene(canvas) {
 
     const ratio = width / height;
 
-    Rin.scene = new THREE.Scene();
-    Rin.renderer = new THREE.WebGLRenderer({ canvas });
-    Rin.camera = new THREE.PerspectiveCamera(90, ratio, 0.1, 1000);
+    RinEngine.scene = new THREE.Scene();
+    RinEngine.renderer = new THREE.WebGLRenderer({ canvas });
+    RinEngine.camera = new THREE.PerspectiveCamera(90, ratio, 0.1, 1000);
 
-    Rin.camera.position.z = 5;
-    Rin.renderer.setSize(width, height);
-    Rin.scene.background = new THREE.Color(0xafafaf);
+    RinEngine.camera.position.z = 5;
+    RinEngine.renderer.setSize(width, height);
+    RinEngine.scene.background = new THREE.Color(0xafafaf);
 
     // 프레임 업데이트 함수 시작
     requestAnimationFrame(frameUpdate);
@@ -63,35 +63,35 @@ export function createScene(canvas) {
 function frameUpdate(currentTime) {
     requestAnimationFrame(frameUpdate);
 
-    const deltaTime = currentTime - Rin._latestUpdateTime;
-    Rin._latestUpdateTime = currentTime;
+    const deltaTime = currentTime - RinEngine._latestUpdateTime;
+    RinEngine._latestUpdateTime = currentTime;
 
     // ----- Scene Update -----
-    if (Rin.enableSceneUpdate === false) {
-        Rin._latestFrameUpdateTime = currentTime;
+    if (RinEngine.enableSceneUpdate === false) {
+        RinEngine._latestFrameUpdateTime = currentTime;
         return;
     }
 
-    Rin._frameElapsedTime += deltaTime;
+    RinEngine._frameElapsedTime += deltaTime;
 
-    if (Rin._frameElapsedTime >= Rin._frameInterval) {
-        sceneUpdate(currentTime - Rin._latestFrameUpdateTime);
-        Rin._latestFrameUpdateTime = currentTime;
-        Rin._frameElapsedTime -= Rin._frameInterval;
+    if (RinEngine._frameElapsedTime >= RinEngine._frameInterval) {
+        sceneUpdate(currentTime - RinEngine._latestFrameUpdateTime);
+        RinEngine._latestFrameUpdateTime = currentTime;
+        RinEngine._frameElapsedTime -= RinEngine._frameInterval;
     }
 
     // ----- Game Update -----
-    if (Rin.enableGameUpdate === false) {
-        Rin._latestTickUpdateTime = currentTime;
+    if (RinEngine.enableGameUpdate === false) {
+        RinEngine._latestTickUpdateTime = currentTime;
         return;
     }
 
-    Rin._tickElapsedTime += deltaTime;
+    RinEngine._tickElapsedTime += deltaTime;
 
-    if (Rin._tickElapsedTime >= Rin._tickInterval) {
-        gameUpdate(currentTime - Rin._latestTickUpdateTime);
-        Rin._latestTickUpdateTime = currentTime;
-        Rin._tickElapsedTime -= Rin._tickInterval;
+    if (RinEngine._tickElapsedTime >= RinEngine._tickInterval) {
+        gameUpdate(currentTime - RinEngine._latestTickUpdateTime);
+        RinEngine._latestTickUpdateTime = currentTime;
+        RinEngine._tickElapsedTime -= RinEngine._tickInterval;
     }
 }
 
@@ -99,7 +99,7 @@ function frameUpdate(currentTime) {
  * 매 프레임 마다 호출되는 Scene 업데이트 함수입니다.
  */
 function sceneUpdate(deltaTime) {
-    Rin.renderer.render(Rin.scene, Rin.camera);
+    RinEngine.renderer.render(RinEngine.scene, RinEngine.camera);
 }
 
 /**

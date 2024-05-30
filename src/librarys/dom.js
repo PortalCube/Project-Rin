@@ -1,4 +1,4 @@
-import { Rin } from "./engine.js";
+import { RinEngine } from "./engine.js";
 
 export function registerVisibilityChangeEvent() {
     document.addEventListener("visibilitychange", () => {
@@ -7,27 +7,27 @@ export function registerVisibilityChangeEvent() {
             // 마지막 프레임 갱신 시각들을 현재 시각으로 설정
             const currentTime = performance.now();
 
-            Rin._latestUpdateTime = currentTime;
-            Rin._latestFrameUpdateTime = currentTime;
-            Rin._latestTickUpdateTime = currentTime;
+            RinEngine._latestUpdateTime = currentTime;
+            RinEngine._latestFrameUpdateTime = currentTime;
+            RinEngine._latestTickUpdateTime = currentTime;
 
             // 프레임 업데이트 시간 간격 초기화
-            Rin._frameElapsedTime = 0;
-            Rin._tickElapsedTime = 0;
+            RinEngine._frameElapsedTime = 0;
+            RinEngine._tickElapsedTime = 0;
         }
     });
 }
 
 export function registerResizeEvent() {
     window.addEventListener("resize", () => {
-        if (Rin.camera && Rin.renderer) {
+        if (RinEngine.camera && RinEngine.renderer) {
             const width = window.innerWidth;
             const height = window.innerHeight;
 
-            Rin.camera.aspect = width / height;
-            Rin.camera.updateProjectionMatrix();
+            RinEngine.camera.aspect = width / height;
+            RinEngine.camera.updateProjectionMatrix();
 
-            Rin.renderer.setSize(width, height);
+            RinEngine.renderer.setSize(width, height);
         }
     });
 }
