@@ -1,5 +1,8 @@
 import { registerResizeEvent, registerVisibilityChangeEvent } from "./dom.js";
 import { createScene } from "./engine.js";
+import { Log } from "./log.js";
+import { MAP_HEIGHT } from "./setting.js";
+import { World } from "./worlds/world.js";
 
 // 게임 메인 객체
 export const Game = {
@@ -20,4 +23,9 @@ export function createGame(canvas) {
 
     // 브라우저 resize 이벤트 등록
     registerResizeEvent();
+
+    const world = new World(16, MAP_HEIGHT);
+    world.generate();
+
+    Log.info(world.getBlock(-7, 32, 6));
 }
