@@ -45,3 +45,12 @@ export function getChunkCoordinate(value, chunkSize) {
     const n = value + Math.floor((chunkSize - 1) / 2);
     return mod(n, chunkSize);
 }
+
+/**
+ * enum을 생성합니다. value로 들어온 객체를 freeze하여 수정할 수 없도록 합니다.
+ * @param {Object} value
+ * @returns {Object}
+ */
+export function createEnum(value) {
+    return Object.freeze(value);
+}

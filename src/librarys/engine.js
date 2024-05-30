@@ -1,11 +1,26 @@
 import * as THREE from "three";
+import { RinScene } from "./scenes/scene.js";
+import { DefaultScene } from "./scenes/default.js";
 
-// 엔진 메인 객체
+// 엔진 메인 object
 export const RinEngine = {
-    // Three.js Variables
+    // RinScene Variables
     scene: null,
+
+    get width() {
+        return window.innerWidth;
+    },
+
+    get height() {
+        return window.innerHeight;
+    },
+
+    get ratio() {
+        return window.innerWidth / window.innerHeight;
+    },
+
+    // Three.js Variables
     renderer: null,
-    camera: null,
 
     // Scene Variables
     enableSceneUpdate: true,
@@ -36,22 +51,30 @@ export const RinEngine = {
 };
 
 /**
- * WebGL Scene을 초기화합니다.
+ * RinScene을 불러옵니다.
+ * @param {function} scene
+ */
+export function loadScene(Scene) {
+    if (RinEngine.scene) {
+        // 기존 Scene이 있다면 Unload 합니다.
+        RinEngine.scene.status = RinScene.SceneStatus.Unloading;
+        RinEngine.scene.OnUnload();
+    }
+
+    RinEngine.scene = new Scene();
+    RinEngine.scene.OnLoad();
+}
+
+/**
+ * WebGL Scene을 초기화하고 기본 Scene을 불러옵니다.
  * @param {HTMLCanvasElement} canvas
  */
-export function createScene(canvas) {
-    const width = window.clientWidth;
-    const height = window.clientHeight;
-
-    const ratio = width / height;
-
-    RinEngine.scene = new THREE.Scene();
+export function createScene(canvas, Scene = DefaultScene) {
     RinEngine.renderer = new THREE.WebGLRenderer({ canvas });
-    RinEngine.camera = new THREE.PerspectiveCamera(90, ratio, 0.1, 1000);
+    RinEngine.renderer.setSize(RinEngine.width, RinEngine.height);
 
-    RinEngine.camera.position.z = 5;
-    RinEngine.renderer.setSize(width, height);
-    RinEngine.scene.background = new THREE.Color(0xafafaf);
+    // 기본 Scene을 불러옵니다.
+    loadScene(Scene);
 
     // 프레임 업데이트 함수 시작
     requestAnimationFrame(frameUpdate);
@@ -99,10 +122,29 @@ function frameUpdate(currentTime) {
  * 매 프레임 마다 호출되는 Scene 업데이트 함수입니다.
  */
 function sceneUpdate(deltaTime) {
-    RinEngine.renderer.render(RinEngine.scene, RinEngine.camera);
+    deltaTime /= 1000;
+
+    const status = RinEngine.scene.status;
+
+    if (status === RinScene.SceneStatus.Loaded) {
+        const scene = RinEngine.scene.scene;
+        const camera = RinEngine.scene.camera;
+        const renderer = RinEngine.renderer;
+
+        renderer.render(scene, camera);
+    }
 }
 
 /**
  * 매 게임 틱마다 호출되는 Game 업데이트 함수입니다.
  */
-function gameUpdate(deltaTime) {}
+function gameUpdate(deltaTime) {
+    deltaTime /= 1000;
+
+    const status = RinEngine.scene.status;
+
+    if (status === RinScene.SceneStatus.Loaded) {
+        // Scene Update
+        RinEngine.scene.OnUpdate(deltaTime);
+    }
+}

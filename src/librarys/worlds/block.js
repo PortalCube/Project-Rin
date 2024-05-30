@@ -1,13 +1,14 @@
 import { Vector3 } from "three";
+import { createEnum } from "../util.js";
 
-export const BlockDirection = {
+export const Direction = createEnum({
     UP: 0,
     DOWN: 1,
     LEFT: 2,
     RIGHT: 3,
     FRONT: 4,
     BACK: 5,
-};
+});
 
 export class Block {
     id = 0;
@@ -18,10 +19,14 @@ export class Block {
     coordinate = null;
     direction = null;
 
+    static get Direction() {
+        return Direction;
+    }
+
     constructor(
         id,
         coordinate = new Vector3(0, 0, 0),
-        direction = BlockDirection.UP
+        direction = Direction.UP
     ) {
         this.id = id;
         this.coordinate = coordinate;

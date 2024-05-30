@@ -20,13 +20,11 @@ export function registerVisibilityChangeEvent() {
 
 export function registerResizeEvent() {
     window.addEventListener("resize", () => {
-        if (RinEngine.camera && RinEngine.renderer) {
+        if (RinEngine.scene) {
             const width = window.innerWidth;
             const height = window.innerHeight;
 
-            RinEngine.camera.aspect = width / height;
-            RinEngine.camera.updateProjectionMatrix();
-
+            RinEngine.scene.OnResize();
             RinEngine.renderer.setSize(width, height);
         }
     });
