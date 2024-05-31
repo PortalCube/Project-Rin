@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RinScene } from "./scenes/scene.js";
 import { DefaultScene } from "./scenes/default.js";
+import { RinInput } from "./input.js";
 
 // 엔진 메인 object
 export const RinEngine = {
@@ -96,16 +97,16 @@ export function createScene(canvas, Scene = DefaultScene) {
 
 /**
  * 매 AnimationFrame 마다 호출되는 브라우저 업데이트 함수입니다.
+ * @param {DOMHighResTimeStamp} currentTime
  */
 function frameUpdate(currentTime) {
-    requestAnimationFrame(frameUpdate);
-
     const deltaTime = currentTime - RinEngine._latestUpdateTime;
     RinEngine._latestUpdateTime = currentTime;
 
     // ----- Scene Update -----
     if (RinEngine.enableSceneUpdate === false) {
         RinEngine._latestFrameUpdateTime = currentTime;
+        requestAnimationFrame(frameUpdate);
         return;
     }
 
@@ -120,6 +121,7 @@ function frameUpdate(currentTime) {
     // ----- Game Update -----
     if (RinEngine.enableGameUpdate === false) {
         RinEngine._latestTickUpdateTime = currentTime;
+        requestAnimationFrame(frameUpdate);
         return;
     }
 
@@ -130,6 +132,8 @@ function frameUpdate(currentTime) {
         RinEngine._latestTickUpdateTime = currentTime;
         RinEngine._tickElapsedTime -= RinEngine._tickInterval;
     }
+
+    requestAnimationFrame(frameUpdate);
 }
 
 /**
@@ -137,6 +141,8 @@ function frameUpdate(currentTime) {
  */
 function sceneUpdate(deltaTime) {
     deltaTime /= 1000;
+
+    RinInput._preUpdate();
 
     const status = RinEngine.scene.status;
 
@@ -149,6 +155,8 @@ function sceneUpdate(deltaTime) {
 
         renderer.render(scene, camera);
     }
+
+    RinInput._postUpdate();
 }
 
 /**
