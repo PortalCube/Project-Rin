@@ -7,6 +7,11 @@ import { Chunk } from "./chunk.js";
 
 export class World {
     /**
+     * @type {RinScene}
+     */
+    scene = null;
+
+    /**
      * @type {Chunk[][]} [x][z]
      */
     chunks = [];
@@ -21,16 +26,18 @@ export class World {
     minChunkValue = 0;
     maxChunkValue = 0;
 
-    constructor(size, depth = MAP_HEIGHT) {
-        this.width = size;
-        this.height = size;
-        this.depth = depth;
+    constructor(scene) {
+        this.scene = scene;
     }
 
     /**
      * 맵에 청크와 블록을 채워서 새로운 맵을 생성합니다.
      */
-    generate() {
+    generate(size, depth = MAP_HEIGHT) {
+        this.width = size;
+        this.height = size;
+        this.depth = depth;
+
         [this.minWorldValue, this.maxWorldValue] = getMinMax(this.width);
         this.minChunkValue = getChunkIndex(this.minWorldValue, CHUNK_SIZE);
         this.maxChunkValue = getChunkIndex(this.maxWorldValue, CHUNK_SIZE);
@@ -46,7 +53,8 @@ export class World {
         for (let x = this.minChunkValue; x <= this.maxChunkValue; x++) {
             const list = [];
             for (let z = this.minChunkValue; z <= this.maxChunkValue; z++) {
-                const chunk = new Chunk(this.depth, new Vector2(x, z));
+                const chunk = new Chunk(this, new Vector2(x, z));
+                chunk.generate(this.depth);
                 list.push(chunk);
             }
             this.chunks.push(list);
@@ -84,7 +92,11 @@ export class World {
     getChunk(x, z) {
         const i = getChunkIndex(x, CHUNK_SIZE) - this.minChunkValue;
         const j = getChunkIndex(z, CHUNK_SIZE) - this.minChunkValue;
-        return this.chunks[i][j];
+
+        const yList = this.chunks[i];
+        if (!yList) return null;
+
+        return yList[j] || null;
     }
 
     /**

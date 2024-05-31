@@ -3,8 +3,14 @@ import { CHUNK_SIZE } from "../setting.js";
 import { Vector2, Vector3 } from "three";
 import { getMinMax } from "../util.js";
 import { Log } from "../log.js";
+import { World } from "./world.js";
 
 export class Chunk {
+    /**
+     * @type {World}
+     */
+    world = null;
+
     /**
      * @type {Block[][][]} [x][y][z]
      */
@@ -16,22 +22,28 @@ export class Chunk {
     coordinate = null;
 
     /**
-     * 청크 시작 X 좌표
+     * 청크의 최소 world X 좌표
      */
-    chunkStartX = 0;
+    minX = 0;
 
     /**
-     * 청크 시작 Z 좌표
+     * 청크의 최소 world Z 좌표
      */
-    chunkStartZ = 0;
+    minZ = 0;
 
-    constructor(depth, coordinate = new Vector2(0, 0)) {
+    constructor(world, coordinate = new Vector2(0, 0)) {
+        this.world = world;
         this.coordinate = coordinate;
 
         const [minValue, _] = getMinMax(CHUNK_SIZE);
-        this.chunkStartX = coordinate.x * CHUNK_SIZE + minValue;
-        this.chunkStartZ = coordinate.y * CHUNK_SIZE + minValue;
+        this.minX = coordinate.x * CHUNK_SIZE + minValue;
+        this.minZ = coordinate.y * CHUNK_SIZE + minValue;
+    }
 
+    /**
+     * 청크를 생성합니다.
+     */
+    generate(depth) {
         // 청크 내부 블록 초기화
         for (let x = 0; x < CHUNK_SIZE; x++) {
             const yList = [];
@@ -39,10 +51,10 @@ export class Chunk {
                 const zList = [];
                 for (let z = 0; z < CHUNK_SIZE; z++) {
                     // 공기 블록으로 초기화
-                    const _x = this.chunkStartX + x;
+                    const _x = this.minX + x;
                     const _y = y;
-                    const _z = this.chunkStartZ + z;
-                    zList.push(new Block(0, new Vector3(_x, _y, _z)));
+                    const _z = this.minZ + z;
+                    zList.push(new Block(this, 0, new Vector3(_x, _y, _z)));
                 }
                 yList.push(zList);
             }
@@ -81,6 +93,6 @@ export class Chunk {
         const zList = yList[y];
         if (!zList) return null;
 
-        return zList[z];
+        return zList[z] || null;
     }
 }

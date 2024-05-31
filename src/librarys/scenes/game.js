@@ -5,8 +5,10 @@ import * as THREE from "three";
 import { RinScene } from "./scene.js";
 import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
-import { FOV } from "../setting.js";
+import { CHUNK_SIZE, FOV, GROUND_LEVEL, MAP_HEIGHT } from "../setting.js";
 import { Player } from "../entities/player.js";
+import { Block } from "../worlds/block.js";
+import { World } from "../worlds/world.js";
 
 export class GameScene extends RinScene {
     /**
@@ -17,29 +19,46 @@ export class GameScene extends RinScene {
     constructor() {
         super();
 
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x000000);
-
-        this.player = new Player(this);
-
-        // 테스트용 큐브 만들기
-        const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const cube1 = new THREE.Mesh(geometry, material);
-        const cube2 = new THREE.Mesh(geometry, material);
-
-        cube1.position.set(0, -2, 0);
-        cube2.position.set(3, -2, 0);
-
-        this.scene.add(cube1);
-        this.scene.add(cube2);
-        this.scene.add(this.player.instance);
-
         Log.info("GameScene Loaded");
     }
 
     onLoad() {
         super.onLoad();
+
+        // Three.js Scene 생성
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x000000);
+
+        // 새로운 월드 생성
+        const world = new World(this);
+        world.generate(16, MAP_HEIGHT);
+
+        // 플레이어 생성
+        this.player = new Player(this);
+        this.scene.add(this.player.instance);
+
+        const chunkLength = world.maxChunkValue - world.minChunkValue + 1;
+
+        for (let cx = 0; cx < chunkLength; cx++) {
+            for (let cz = 0; cz < chunkLength; cz++) {
+                const chunk = world.chunks[cx][cz];
+                for (let x = 0; x < CHUNK_SIZE; x++) {
+                    for (let y = 0; y < MAP_HEIGHT; y++) {
+                        for (let z = 0; z < CHUNK_SIZE; z++) {
+                            const block = chunk.getBlock(x, y, z);
+
+                            if (block.id !== 0) {
+                                const mesh = block.load();
+
+                                if (mesh) {
+                                    this.scene.add(mesh);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     onUpdate(deltaTime) {
