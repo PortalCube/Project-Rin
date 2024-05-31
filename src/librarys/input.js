@@ -24,14 +24,8 @@ export const RinInput = {
     },
 
     _latestPointerPosition: {
-        x: null,
-        y: null,
-        dx: null,
-        dy: null,
-
-        // 급격한 마우스 좌표 변화가 예상되는 구간에서 (포인터 잠금 해제, alt-tab등)
-        // delta 값을 0으로 고정하는 플래그
-        _teleport: false,
+        dx: 0,
+        dy: 0,
     },
 
     _wheelDelta: 0,
@@ -170,24 +164,10 @@ export const RinInput = {
         const latest = this._latestPointerPosition;
         const current = this._pointerPosition;
 
-        if (this.pointerLockApplyed) {
-            current.x += latest.dx;
-            current.y += latest.dy;
-            current.dx = latest.dx;
-            current.dy = latest.dy;
-        } else {
-            current.dx = latest.x - current.x;
-            current.dy = latest.y - current.y;
-            current.x = latest.x;
-            current.y = latest.y;
-
-            // 마우스가 급격히 변화한 경우, delta 값을 0으로 초기화
-            if (latest._teleport) {
-                current.dx = 0;
-                current.dy = 0;
-                latest._teleport = false;
-            }
-        }
+        current.x += latest.dx;
+        current.y += latest.dy;
+        current.dx = latest.dx;
+        current.dy = latest.dy;
     },
 
     /**
@@ -200,10 +180,8 @@ export const RinInput = {
         this._keyDown.clear();
         this._keyUp.clear();
 
-        if (this.pointerLockApplyed) {
-            this._latestPointerPosition.dx = 0;
-            this._latestPointerPosition.dy = 0;
-        }
+        this._latestPointerPosition.dx = 0;
+        this._latestPointerPosition.dy = 0;
     },
 };
 
@@ -213,38 +191,12 @@ window.addEventListener("click", () => {
 });
 
 document.addEventListener("pointerlockchange", () => {
-    // 두 모드간의 mousePosition 변환
-
-    const latest = RinInput._latestPointerPosition;
-    const current = RinInput._pointerPosition;
-
-    if (RinInput.pointerLockApplyed) {
-        // 포인터 잠금이 적용되었을 때
-
-        // position을 delta로 변환
-        latest.dx = latest.x - current.x;
-        latest.dy = latest.y - current.y;
-
-        // 기존 값 0으로 초기화
-        latest.x = null;
-        latest.y = null;
-    } else {
-        // 포인터 잠금이 해제되었을 때
-
-        // delta를 position으로 변환
-        latest.x = current.x + latest.dx;
-        latest.y = current.y + latest.dy;
-
-        // 기존 값 0으로 초기화
-        latest.dx = null;
-        latest.dy = null;
-
-        RinInput._latestPointerPosition._teleport = true;
-
-        // 포인터 잠금이 강제로 해제되었을 때
-        if (RinInput.pointerLock === true) {
-            RinInput._latestLockTime = performance.now();
-        }
+    // 포인터 잠금이 강제로 해제되었을 때
+    if (
+        RinInput.pointerLockApplyed === false &&
+        RinInput.pointerLock === true
+    ) {
+        RinInput._latestLockTime = performance.now();
     }
 });
 
@@ -252,13 +204,6 @@ window.addEventListener("mousemove", (event) => {
     if (RinInput.pointerLockApplyed) {
         RinInput._latestPointerPosition.dx += event.movementX;
         RinInput._latestPointerPosition.dy += event.movementY;
-    } else {
-        if (RinInput._latestPointerPosition.x === null) {
-            RinInput._latestPointerPosition._teleport = true;
-        }
-
-        RinInput._latestPointerPosition.x = event.clientX;
-        RinInput._latestPointerPosition.y = event.clientY;
     }
 });
 
@@ -294,8 +239,4 @@ window.addEventListener("blur", () => {
     RinInput._keyDown.clear();
     RinInput._key.clear();
     RinInput._keyUp.clear();
-});
-
-window.addEventListener("focus", () => {
-    RinInput._latestPointerPosition._teleport = true;
 });

@@ -36,8 +36,4 @@ export function registerCanvasInputEvent(canvas) {
         RinInput._userGesture = true;
         RinInput.updatePointerLock();
     });
-
-    canvas.addEventListener("mouseenter", () => {
-        RinInput._latestPointerPosition._teleport = true;
-    });
 }
