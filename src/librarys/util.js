@@ -1,3 +1,5 @@
+import * as THREE from "three";
+
 /**
  * n을 m으로 나눈 나머지를 반환합니다. n이 음수인 경우도 양수로 반환합니다.
  * @param {number} n
@@ -53,4 +55,31 @@ export function getChunkCoordinate(value, chunkSize) {
  */
 export function createEnum(value) {
     return Object.freeze(value);
+}
+
+/**
+ * value를 min과 max 사이의 값으로 clamp합니다.
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @returns {number} min과 max 사이의 clamp된 value
+ */
+export function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Vector3를 Y축으로 angle만큼 회전한 값을 반환합니다.
+ * @param {THREE.Vector3} vector
+ * @param {number} angle
+ * @returns {THREE.Vector3}
+ */
+export function rotateVector3(vector, angle) {
+    const x = vector.x;
+    const z = vector.z;
+
+    const _x = x * Math.cos(angle) + z * Math.sin(angle);
+    const _z = -x * Math.sin(angle) + z * Math.cos(angle);
+
+    return new THREE.Vector3(_x, vector.y, _z);
 }
