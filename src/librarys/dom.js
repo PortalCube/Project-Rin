@@ -24,7 +24,7 @@ export function registerResizeEvent() {
             const width = window.innerWidth;
             const height = window.innerHeight;
 
-            RinEngine.scene.OnResize();
+            RinEngine.scene.onResize();
             RinEngine.renderer.setSize(width, height);
         }
     });

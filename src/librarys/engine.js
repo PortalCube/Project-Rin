@@ -4,9 +4,6 @@ import { DefaultScene } from "./scenes/default.js";
 
 // 엔진 메인 object
 export const RinEngine = {
-    // RinScene Variables
-    scene: null,
-
     get width() {
         return window.innerWidth;
     },
@@ -19,31 +16,45 @@ export const RinEngine = {
         return window.innerWidth / window.innerHeight;
     },
 
-    // Three.js Variables
+    /**
+     * @type {RinScene}
+     */
+    scene: null,
+
+    /**
+     * @type {THREE.WebGLRenderer}
+     */
     renderer: null,
 
-    // Scene Variables
-    enableSceneUpdate: true,
-    framePerSecond: 0,
-
-    // Game Tick Variables
     enableGameUpdate: true,
+    enableSceneUpdate: true,
+
+    /*
+     * framePerSecond
+     * - DOM의 Canvas element에 1초당 얼마나 그릴지를 결정
+     * - 플레이어의 입력 및 그래픽 출력등 즉각적인 반응이 필요한 로직은 FPS의 빈도로 처리
+     *
+     * tickPerSecond
+     *  - RinEngine이 게임 로직을 1초당 얼마나 처리할지 결정
+     *  - 농작물의 성장, 문의 열림 닫힘, 청크 생성 등 모든 게임 로직은 TPS의 빈도로 처리
+     */
+    framePerSecond: 0,
     tickPerSecond: 60,
 
-    // Frame Update Variables
+    // ## Frame Update Variables
     _latestUpdateTime: performance.now(),
 
-    // Scene Update Variables
+    // ## Scene Update Variables
     _frameElapsedTime: 0,
     _latestFrameUpdateTime: performance.now(),
+
+    // ## Game Update Variables
+    _tickElapsedTime: 0,
+    _latestTickUpdateTime: performance.now(),
 
     get _frameInterval() {
         return this.framePerSecond > 0 ? 1000 / this.framePerSecond : 0;
     },
-
-    // Game Update Variables
-    _tickElapsedTime: 0,
-    _latestTickUpdateTime: performance.now(),
 
     get _tickInterval() {
         return this.tickPerSecond > 0 ? 1000 / this.tickPerSecond : 0;
@@ -58,11 +69,14 @@ export function loadScene(Scene) {
     if (RinEngine.scene) {
         // 기존 Scene이 있다면 Unload 합니다.
         RinEngine.scene.status = RinScene.SceneStatus.Unloading;
-        RinEngine.scene.OnUnload();
+        RinEngine.scene.onUnload();
+        RinEngine.scene.status = RinScene.SceneStatus.Unloaded;
     }
 
     RinEngine.scene = new Scene();
-    RinEngine.scene.OnLoad();
+    RinEngine.scene.status = RinScene.SceneStatus.Loading;
+    RinEngine.scene.onLoad();
+    RinEngine.scene.status = RinScene.SceneStatus.Loaded;
 }
 
 /**
@@ -127,6 +141,8 @@ function sceneUpdate(deltaTime) {
     const status = RinEngine.scene.status;
 
     if (status === RinScene.SceneStatus.Loaded) {
+        RinEngine.scene.onFrameUpdate(deltaTime);
+
         const scene = RinEngine.scene.scene;
         const camera = RinEngine.scene.camera;
         const renderer = RinEngine.renderer;
@@ -144,7 +160,6 @@ function gameUpdate(deltaTime) {
     const status = RinEngine.scene.status;
 
     if (status === RinScene.SceneStatus.Loaded) {
-        // Scene Update
-        RinEngine.scene.OnUpdate(deltaTime);
+        RinEngine.scene.onUpdate(deltaTime);
     }
 }
