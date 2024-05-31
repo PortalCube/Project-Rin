@@ -1,4 +1,5 @@
 import { RinEngine } from "./engine.js";
+import { RinInput } from "./input.js";
 
 export function registerVisibilityChangeEvent() {
     document.addEventListener("visibilitychange", () => {
@@ -27,5 +28,16 @@ export function registerResizeEvent() {
             RinEngine.scene.onResize();
             RinEngine.renderer.setSize(width, height);
         }
+    });
+}
+
+export function registerCanvasInputEvent(canvas) {
+    canvas.addEventListener("click", () => {
+        RinInput._userGesture = true;
+        RinInput.updatePointerLock();
+    });
+
+    canvas.addEventListener("mouseenter", () => {
+        RinInput._latestPointerPosition._teleport = true;
     });
 }

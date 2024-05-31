@@ -88,6 +88,9 @@ export function createScene(canvas, Scene = DefaultScene) {
     RinEngine.renderer = new THREE.WebGLRenderer({ canvas });
     RinEngine.renderer.setSize(RinEngine.width, RinEngine.height);
 
+    // 포인터를 잠급니다.
+    RinInput.setPointerLock(true);
+
     // 기본 Scene을 불러옵니다.
     loadScene(Scene);
 

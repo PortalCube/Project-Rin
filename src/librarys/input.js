@@ -9,7 +9,13 @@
  * RinScene의 오브젝트들은 매 update 주기마다 싱글톤 패턴으로 관리되는 RinInput 객체를 통해서 사용자의 입력을 처리합니다.
  */
 
+import { RinEngine } from "./engine.js";
+import { Log } from "./log.js";
+
 export const RinInput = {
+    _userGesture: false,
+    _latestLockTime: 0,
+
     _pointerPosition: {
         x: 0,
         y: 0,
@@ -18,8 +24,14 @@ export const RinInput = {
     },
 
     _latestPointerPosition: {
-        x: 0,
-        y: 0,
+        x: null,
+        y: null,
+        dx: null,
+        dy: null,
+
+        // 급격한 마우스 좌표 변화가 예상되는 구간에서 (포인터 잠금 해제, alt-tab등)
+        // delta 값을 0으로 고정하는 플래그
+        _teleport: false,
     },
 
     _wheelDelta: 0,
@@ -32,12 +44,22 @@ export const RinInput = {
     _key: new Set(),
     _keyUp: new Set(),
 
+    _pointerLock: false,
+
     get pointerPosition() {
         return this._pointerPosition;
     },
 
     get wheelDelta() {
         return this._wheelDelta;
+    },
+
+    get pointerLockApplyed() {
+        return document.pointerLockElement === RinEngine.renderer.domElement;
+    },
+
+    get pointerLock() {
+        return this._pointerLock;
     },
 
     /**
@@ -96,15 +118,76 @@ export const RinInput = {
     },
 
     /**
+     * 포인터 잠금 상태를 지정합니다.
+     * @param {boolean} value
+     */
+    async setPointerLock(value) {
+        this._pointerLock = value;
+
+        if (value) {
+            this.requestPointerLock();
+        } else {
+            document.exitPointerLock();
+        }
+    },
+
+    /**
+     * 포인터 잠가서 화면에서 숨기고, 화면 밖으로 나가지 않게 합니다.
+     */
+    async requestPointerLock() {
+        // 사용자가 브라우저와 상호작용(click)을 했는가?
+        if (this._userGesture === false) {
+            return;
+        }
+
+        // 사용자가 1500ms 이내로 포인터 잠금을 강제로 푼 적이 있는가?
+        // -> 1500ms 이내로 다시 요청하면 브라우저에서 에러를 발생시킴
+        if (performance.now() - this._latestLockTime < 1500) {
+            return;
+        }
+
+        // 포인터 잠금을 요청
+        const canvas = RinEngine.renderer.domElement;
+        await canvas.requestPointerLock({
+            unadjustedMovement: true,
+        });
+    },
+
+    /**
+     * 브라우저의 포인터 잠금 상태를 내부 상태에 맞게 업데이트합니다.
+     * 사용자가 ESC키를 눌렀거나, Alt-tab 등으로 RinEngine이 의도치 않게 포인트 잠금이 풀린 경우 이 함수를 사용합니다.
+     */
+    async updatePointerLock() {
+        if (this.pointerLock && this.pointerLockApplyed === false) {
+            this.requestPointerLock();
+        }
+    },
+
+    /**
      * 이전 프레임에서 변경된 입력 상태들을 업데이트합니다.
      */
     _preUpdate() {
-        this._pointerPosition.dx =
-            this._latestPointerPosition.x - this._pointerPosition.x;
-        this._pointerPosition.dy =
-            this._latestPointerPosition.y - this._pointerPosition.y;
-        this._pointerPosition.x = this._latestPointerPosition.x;
-        this._pointerPosition.y = this._latestPointerPosition.y;
+        const latest = this._latestPointerPosition;
+        const current = this._pointerPosition;
+
+        if (this.pointerLockApplyed) {
+            current.x += latest.dx;
+            current.y += latest.dy;
+            current.dx = latest.dx;
+            current.dy = latest.dy;
+        } else {
+            current.dx = latest.x - current.x;
+            current.dy = latest.y - current.y;
+            current.x = latest.x;
+            current.y = latest.y;
+
+            // 마우스가 급격히 변화한 경우, delta 값을 0으로 초기화
+            if (latest._teleport) {
+                current.dx = 0;
+                current.dy = 0;
+                latest._teleport = false;
+            }
+        }
     },
 
     /**
@@ -116,14 +199,69 @@ export const RinInput = {
         this._pointerUp.clear();
         this._keyDown.clear();
         this._keyUp.clear();
+
+        if (this.pointerLockApplyed) {
+            this._latestPointerPosition.dx = 0;
+            this._latestPointerPosition.dy = 0;
+        }
     },
 };
 
 // 이벤트 리스너 등록
-window.addEventListener("mousemove", (event) => {
-    RinInput._latestPointerPosition.x = event.clientX;
-    RinInput._latestPointerPosition.y = event.clientY;
+window.addEventListener("click", () => {
+    RinInput._userGesture = true;
 });
+
+document.addEventListener("pointerlockchange", () => {
+    // 두 모드간의 mousePosition 변환
+
+    const latest = RinInput._latestPointerPosition;
+    const current = RinInput._pointerPosition;
+
+    if (RinInput.pointerLockApplyed) {
+        // 포인터 잠금이 적용되었을 때
+
+        // position을 delta로 변환
+        latest.dx = latest.x - current.x;
+        latest.dy = latest.y - current.y;
+
+        // 기존 값 0으로 초기화
+        latest.x = null;
+        latest.y = null;
+    } else {
+        // 포인터 잠금이 해제되었을 때
+
+        // delta를 position으로 변환
+        latest.x = current.x + latest.dx;
+        latest.y = current.y + latest.dy;
+
+        // 기존 값 0으로 초기화
+        latest.dx = null;
+        latest.dy = null;
+
+        RinInput._latestPointerPosition._teleport = true;
+
+        // 포인터 잠금이 강제로 해제되었을 때
+        if (RinInput.pointerLock === true) {
+            RinInput._latestLockTime = performance.now();
+        }
+    }
+});
+
+window.addEventListener("mousemove", (event) => {
+    if (RinInput.pointerLockApplyed) {
+        RinInput._latestPointerPosition.dx += event.movementX;
+        RinInput._latestPointerPosition.dy += event.movementY;
+    } else {
+        if (RinInput._latestPointerPosition.x === null) {
+            RinInput._latestPointerPosition._teleport = true;
+        }
+
+        RinInput._latestPointerPosition.x = event.clientX;
+        RinInput._latestPointerPosition.y = event.clientY;
+    }
+});
+
 window.addEventListener("wheel", (event) => {
     RinInput._wheelDelta += event.deltaY;
 });
@@ -146,4 +284,18 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => {
     RinInput._keyUp.add(event.code);
     RinInput._key.delete(event.code);
+});
+
+window.addEventListener("blur", () => {
+    RinInput._wheelDelta = 0;
+    RinInput._pointerDown.clear();
+    RinInput._pointer.clear();
+    RinInput._pointerUp.clear();
+    RinInput._keyDown.clear();
+    RinInput._key.clear();
+    RinInput._keyUp.clear();
+});
+
+window.addEventListener("focus", () => {
+    RinInput._latestPointerPosition._teleport = true;
 });
