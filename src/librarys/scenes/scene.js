@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { RinEngine } from "../engine.js";
 import { createEnum } from "../util.js";
 
@@ -8,51 +9,45 @@ export const SceneStatus = createEnum({
     Unloaded: 3,
 });
 
-export class RinScene {
+export class RinScene extends THREE.EventDispatcher {
     scene = null;
     camera = null;
     status = SceneStatus.Loading;
-
-    _loadEvents = [];
-    _updateEvents = [];
-    _unloadEvents = [];
 
     static get SceneStatus() {
         return SceneStatus;
     }
 
-    constructor() {}
+    constructor() {
+        super();
+    }
 
     // Scene이 로드되었을 때 호출됩니다.
     onLoad() {
-        this._loadEvents.forEach((callback) => callback());
+        // Scene에 load 이벤트를 fire합니다.
+        this.dispatchEvent({ type: "load", scene: this });
     }
 
-    // Scene이 업데이트되었을 때 호출됩니다.
+    // 매 게임 틱마다 호출됩니다.
     onUpdate(deltaTime) {
-        this._updateEvents.forEach((callback) => callback(deltaTime));
+        this.dispatchEvent({ type: "update", scene: this, deltaTime });
+    }
+
+    // 매 프레임마다 호출됩니다.
+    onFrameUpdate(deltaTime) {
+        this.dispatchEvent({ type: "frameUpdate", scene: this, deltaTime });
     }
 
     // Scene이 언로드되었을 때 호출됩니다.
     onUnload() {
-        this._unloadEvents.forEach((callback) => callback());
+        this.dispatchEvent({ type: "unload", scene: this });
     }
 
     // Scene이 리사이즈되었을 때 호출됩니다.
     onResize() {
+        this.dispatchEvent({ type: "resize", scene: this });
+
         this.camera.aspect = RinEngine.ratio;
         this.camera.updateProjectionMatrix();
-    }
-
-    registerLoadEvent(callback) {
-        this._loadEvents.push(callback);
-    }
-
-    registerUpdateEvent(callback) {
-        this._updateEvents.push(callback);
-    }
-
-    registerUnloadEvent(callback) {
-        this._unloadEvents.push(callback);
     }
 }
