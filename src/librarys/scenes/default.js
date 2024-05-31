@@ -22,16 +22,4 @@ export class DefaultScene extends RinScene {
         );
         this.camera.position.z = 3;
     }
-
-    onLoad() {
-        super.onLoad();
-    }
-
-    onUpdate(deltaTime) {
-        super.onUpdate(deltaTime);
-    }
-
-    OnUnload() {
-        super.onUnload();
-    }
 }
