@@ -3,6 +3,8 @@ import { RinScene } from "./scenes/scene.js";
 import { DefaultScene } from "./scenes/default.js";
 import { RinInput } from "./input.js";
 
+import terrain from "../assets/textures/terrain.png";
+
 // 엔진 메인 object
 export const RinEngine = {
     get width() {
@@ -26,6 +28,11 @@ export const RinEngine = {
      * @type {THREE.WebGLRenderer}
      */
     renderer: null,
+
+    /**
+     * @type {THREE.Texture}
+     */
+    texture: null,
 
     enableGameUpdate: true,
     enableSceneUpdate: true,
@@ -90,6 +97,11 @@ export function createScene(canvas, Scene = DefaultScene) {
 
     // 포인터를 잠급니다.
     RinInput.setPointerLock(true);
+
+    // 텍스쳐 로드
+    RinEngine.texture = new THREE.TextureLoader().load(terrain);
+    RinEngine.texture.magFilter = THREE.NearestFilter;
+    RinEngine.texture.minFilter = THREE.NearestMipmapLinearFilter;
 
     // 기본 Scene을 불러옵니다.
     loadScene(Scene);
