@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { FOV } from "../setting.js";
+import { FOV, GROUND_LEVEL } from "../setting.js";
 import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
 import { RinInput } from "../input.js";
@@ -20,6 +20,7 @@ export class Player {
     scene = null;
 
     moveSpeed = 5;
+    runSpeed = 2.5;
     lookSpeed = (Math.PI * 2) / 12;
 
     horizontalAngle = 0;
@@ -42,6 +43,7 @@ export class Player {
 
         this.instance = scene.camera;
         this.instance.position.z = 3;
+        this.instance.position.y = GROUND_LEVEL + 2;
 
         // 이벤트 등록
         // arrow function을 사용하여 this의 context를 Player로 유지
@@ -67,7 +69,11 @@ export class Player {
         this.handleLook(deltaTime);
         this.handleMovement(deltaTime);
 
-        if (RinInput.getKeyDown("KeyE")) {
+        if (RinInput.getKeyDown("Backquote")) {
+            Log.info(this.instance.position);
+        }
+
+        if (RinInput.getKeyDown("Space")) {
             RinInput.setPointerLock(!RinInput.pointerLock);
         }
 
@@ -78,6 +84,7 @@ export class Player {
 
     handleMovement(deltaTime) {
         const inputDirection = new THREE.Vector3(0, 0, 0);
+        let runSpeed = 1;
 
         if (RinInput.getKey("KeyW")) {
             inputDirection.z -= 1;
@@ -95,11 +102,23 @@ export class Player {
             inputDirection.x += 1;
         }
 
+        if (RinInput.getKey("KeyQ")) {
+            inputDirection.y -= 1;
+        }
+
+        if (RinInput.getKey("KeyE")) {
+            inputDirection.y += 1;
+        }
+
+        if (RinInput.getKey("ShiftLeft")) {
+            runSpeed = this.runSpeed;
+        }
+
         const direction = rotateVector3(inputDirection, this.horizontalAngle);
 
         const vec = direction
             .normalize()
-            .multiplyScalar(deltaTime * this.moveSpeed);
+            .multiplyScalar(deltaTime * this.moveSpeed * runSpeed);
         this.instance.position.add(vec);
     }
 
