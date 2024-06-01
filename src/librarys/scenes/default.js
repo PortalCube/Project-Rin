@@ -10,6 +10,10 @@ import { FOV } from "../setting.js";
 export class DefaultScene extends RinScene {
     constructor() {
         super();
+    }
+
+    onLoad() {
+        super.onLoad();
 
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000);
@@ -20,6 +24,7 @@ export class DefaultScene extends RinScene {
             0.1,
             1000
         );
-        this.camera.position.z = 3;
+
+        Log.info("DefaultScene Loaded");
     }
 }

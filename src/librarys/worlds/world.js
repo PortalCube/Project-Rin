@@ -13,7 +13,6 @@ import { RinEngine } from "../engine.js";
 
 import blockVertexShader from "../../assets/shaders/block.vert?raw";
 import blockFragmentShader from "../../assets/shaders/block.frag?raw";
-import { Player } from "../entities/player.js";
 
 function getUVOffset(id, tileSize = 16) {
     const size = 1 / tileSize;

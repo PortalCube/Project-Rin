@@ -49,7 +49,9 @@ export const RinInput = {
     },
 
     get pointerLockApplyed() {
-        return document.pointerLockElement === RinEngine.renderer.domElement;
+        return RinEngine.renderer
+            ? document.pointerLockElement === RinEngine.renderer.domElement
+            : false;
     },
 
     get pointerLock() {
