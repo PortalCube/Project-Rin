@@ -3,9 +3,11 @@ import {
     registerResizeEvent,
     registerVisibilityChangeEvent,
 } from "./dom.js";
-import { createScene } from "./engine.js";
+import { RinEngine, createScene } from "./engine.js";
 import { Log } from "./log.js";
 import { GameScene } from "./scenes/game.js";
+
+import Stats from "three/addons/libs/stats.module.js";
 
 /**
  * 주어진 canvas element에 게임을 생성합니다.
@@ -23,4 +25,12 @@ export async function createGame(canvas) {
 
     // Canvas Input 이벤트 등록
     registerCanvasInputEvent(canvas);
+}
+
+export function useStats() {
+    if (RinEngine.stats === null) {
+        RinEngine.stats = new Stats();
+    }
+
+    return <div ref={(ref) => ref.appendChild(RinEngine.stats.dom)}></div>;
 }

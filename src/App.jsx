@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import "./App.css";
 import styled from "styled-components";
-import { createGame } from "./librarys/main.js";
+import { createGame, useStats } from "./librarys/main.jsx";
 
 const Container = styled.div`
     display: flex;
@@ -26,8 +26,11 @@ function App() {
         }
     }, [ref]);
 
+    const stats = useStats();
+
     return (
         <Container>
+            {stats}
             <Canvas ref={ref} />
         </Container>
     );

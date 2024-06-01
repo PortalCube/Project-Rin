@@ -3,6 +3,8 @@ import { RinScene } from "./scenes/scene.js";
 import { DefaultScene } from "./scenes/default.js";
 import { RinInput } from "./input.js";
 
+import Stats from "three/addons/libs/stats.module.js";
+
 import terrain from "../assets/textures/terrain.png";
 
 // 엔진 메인 object
@@ -34,17 +36,24 @@ export const RinEngine = {
      */
     texture: null,
 
+    /**
+     * @type {Stats}
+     */
+    stats: null,
+
     enableGameUpdate: true,
     enableSceneUpdate: true,
 
     /*
      * framePerSecond
-     * - DOM의 Canvas element에 1초당 얼마나 그릴지를 결정
+     * - DOM의 Canvas element에 1초당 얼마나 그릴지(renderer.render)를 결정
      * - 플레이어의 입력 및 그래픽 출력등 즉각적인 반응이 필요한 로직은 FPS의 빈도로 처리
      *
      * tickPerSecond
-     *  - RinEngine이 게임 로직을 1초당 얼마나 처리할지 결정
+     *  - RinEngine이 게임 로직(onUpdate)을 1초당 얼마나 처리할지 결정
      *  - 농작물의 성장, 문의 열림 닫힘, 청크 생성 등 모든 게임 로직은 TPS의 빈도로 처리
+     *
+     *  두 값 모두 0으로 설정시 모니터 주사율에 맞추어 최대한 자주 업데이트
      */
     framePerSecond: 0,
     tickPerSecond: 60,
@@ -117,6 +126,10 @@ export function createScene(canvas, Scene = DefaultScene) {
 function frameUpdate(currentTime) {
     const deltaTime = currentTime - RinEngine._latestUpdateTime;
     RinEngine._latestUpdateTime = currentTime;
+
+    if (RinEngine.stats) {
+        RinEngine.stats.update();
+    }
 
     // ----- Scene Update -----
     if (RinEngine.enableSceneUpdate === false) {
