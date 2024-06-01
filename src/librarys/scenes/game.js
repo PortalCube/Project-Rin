@@ -3,11 +3,9 @@
 
 import * as THREE from "three";
 import { RinScene } from "./scene.js";
-import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
-import { CHUNK_SIZE, FOV, GROUND_LEVEL, MAP_HEIGHT } from "../setting.js";
+import { MAP_HEIGHT } from "../setting.js";
 import { Player } from "../entities/player.js";
-import { Block } from "../worlds/block.js";
 import { World } from "../worlds/world.js";
 
 export class GameScene extends RinScene {
@@ -18,8 +16,6 @@ export class GameScene extends RinScene {
 
     constructor() {
         super();
-
-        Log.info("GameScene Loaded");
     }
 
     onLoad() {
@@ -31,34 +27,16 @@ export class GameScene extends RinScene {
 
         // 새로운 월드 생성
         const world = new World(this);
-        world.generate(16, MAP_HEIGHT);
+        world.generate(320, MAP_HEIGHT);
 
         // 플레이어 생성
         this.player = new Player(this);
         this.scene.add(this.player.instance);
 
-        const chunkLength = world.maxChunkValue - world.minChunkValue + 1;
+        const mesh = world.render(this.player);
+        this.scene.add(mesh);
 
-        for (let cx = 0; cx < chunkLength; cx++) {
-            for (let cz = 0; cz < chunkLength; cz++) {
-                const chunk = world.chunks[cx][cz];
-                for (let x = 0; x < CHUNK_SIZE; x++) {
-                    for (let y = 0; y < MAP_HEIGHT; y++) {
-                        for (let z = 0; z < CHUNK_SIZE; z++) {
-                            const block = chunk.getBlock(x, y, z);
-
-                            if (block.id !== 0) {
-                                const mesh = block.load();
-
-                                if (mesh) {
-                                    this.scene.add(mesh);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Log.info("GameScene Loaded");
     }
 
     onUpdate(deltaTime) {

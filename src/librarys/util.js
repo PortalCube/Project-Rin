@@ -83,3 +83,13 @@ export function rotateVector3(vector, angle) {
 
     return new THREE.Vector3(_x, vector.y, _z);
 }
+
+/**
+ * min, max 사이의 랜덤한 정수를 반환합니다.
+ * @param {number} min
+ * @param {number} max
+ * @returns {number}
+ */
+export function randomRange(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}

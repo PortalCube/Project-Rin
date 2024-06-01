@@ -41,25 +41,42 @@ export class Chunk {
     }
 
     /**
-     * 청크를 생성합니다.
+     * 비어있는 청크를 생성합니다.
      */
     generate(depth) {
-        // 청크 내부 블록 초기화
         for (let x = 0; x < CHUNK_SIZE; x++) {
             const yList = [];
             for (let y = 0; y < depth; y++) {
                 const zList = [];
                 for (let z = 0; z < CHUNK_SIZE; z++) {
-                    // 공기 블록으로 초기화
                     const _x = this.minX + x;
                     const _y = y;
                     const _z = this.minZ + z;
+
                     zList.push(new Block(this, 0, new Vector3(_x, _y, _z)));
                 }
                 yList.push(zList);
             }
             this.blocks.push(yList);
         }
+    }
+
+    /**
+     * Chunk의 렌더링 정보를 생성합니다.
+     * @returns {object[]} 렌더링 정보
+     */
+    getRenderInfos() {
+        const infos = [];
+
+        for (const yList of this.blocks) {
+            for (const zList of yList) {
+                for (const block of zList) {
+                    infos.push(...block.getRenderInfos());
+                }
+            }
+        }
+
+        return infos;
     }
 
     /**

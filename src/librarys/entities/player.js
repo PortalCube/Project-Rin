@@ -20,11 +20,23 @@ export class Player {
     scene = null;
 
     moveSpeed = 5;
-    runSpeed = 2.5;
+    runSpeed = 7.5;
     lookSpeed = (Math.PI * 2) / 12;
 
     horizontalAngle = 0;
     verticalAngle = 0;
+
+    get position() {
+        return this.instance.position;
+    }
+
+    get blockPosition() {
+        return new THREE.Vector3(
+            Math.floor(this.position.x),
+            Math.floor(this.position.y),
+            Math.floor(this.position.z)
+        );
+    }
 
     /**
      * 플레이어를 생성합니다.
@@ -71,6 +83,8 @@ export class Player {
 
         if (RinInput.getKeyDown("Backquote")) {
             Log.info(this.instance.position);
+            Log.info(RinEngine.renderer.info);
+            Log.info(RinEngine.renderer.info.render);
         }
 
         if (RinInput.getKeyDown("Space")) {
@@ -86,6 +100,7 @@ export class Player {
         const inputDirection = new THREE.Vector3(0, 0, 0);
         let runSpeed = 1;
 
+        // z축 이동
         if (RinInput.getKey("KeyW")) {
             inputDirection.z -= 1;
         }
@@ -94,6 +109,7 @@ export class Player {
             inputDirection.z += 1;
         }
 
+        // x축 이동
         if (RinInput.getKey("KeyA")) {
             inputDirection.x -= 1;
         }
@@ -102,6 +118,7 @@ export class Player {
             inputDirection.x += 1;
         }
 
+        // y축 이동
         if (RinInput.getKey("KeyQ")) {
             inputDirection.y -= 1;
         }
@@ -110,15 +127,20 @@ export class Player {
             inputDirection.y += 1;
         }
 
+        // 달리기
         if (RinInput.getKey("ShiftLeft")) {
             runSpeed = this.runSpeed;
         }
 
+        // 이동 벡터를 플레이어가 보는 방향으로 회전
         const direction = rotateVector3(inputDirection, this.horizontalAngle);
 
+        // 이동 벡터를 적절한 속도로 지정
         const vec = direction
             .normalize()
             .multiplyScalar(deltaTime * this.moveSpeed * runSpeed);
+
+        // 플레이어 이동
         this.instance.position.add(vec);
     }
 

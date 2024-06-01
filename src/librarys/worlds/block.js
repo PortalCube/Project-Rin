@@ -1,10 +1,5 @@
 import * as THREE from "three";
-import { createEnum } from "../util.js";
-import blockVertexShader from "../../assets/shaders/block.vert?raw";
-import blockFragmentShader from "../../assets/shaders/block.frag?raw";
-import diamond from "../../assets/textures/diamond.bmp";
-import { RinEngine } from "../engine.js";
-import { Chunk } from "./chunk.js";
+import { createEnum, randomRange } from "../util.js";
 
 //prettier-ignore
 export const Direction = createEnum({
@@ -16,7 +11,7 @@ export const Direction = createEnum({
     Back:  5, // Z-
 });
 
-function getDirectionVector(direction) {
+export function getDirectionVector(direction) {
     switch (direction) {
         case Direction.Right:
             return new THREE.Vector3(1, 0, 0);
@@ -33,39 +28,14 @@ function getDirectionVector(direction) {
     }
 }
 
-function getNearBlock(chunk, coordinate, direction) {
-    const world = chunk.world;
-    const directionVector = getDirectionVector(direction);
-    const targetCoordinate = coordinate.clone().add(directionVector);
-
-    const x = targetCoordinate.x;
-    const y = targetCoordinate.y;
-    const z = targetCoordinate.z;
-
-    return world.getBlock(x, y, z);
-}
-
-function getUVCoordinate(id, tileSize = 16) {
-    const size = 1 / tileSize;
-    const x = (id % tileSize) * size;
-    const y = (tileSize - Math.floor(id / tileSize) - 1) * size;
-
-    const arr = [];
-
-    for (let i = 0; i < 6; i++) {
-        arr.push(x, y + size, x + size, y + size, x, y, x + size, y);
-    }
-
-    return arr;
-}
-
 export class Block {
     /**
      * @type {Chunk}
      */
     chunk = null;
 
-    id = 0;
+    _id = 0;
+    _active = false;
 
     /**
      * @type {THREE.Vector3}
@@ -89,15 +59,43 @@ export class Block {
      */
     material = null;
 
+    get id() {
+        return this._id;
+    }
+
+    set id(value) {
+        if (value === 2) {
+            this._id = randomRange(1, 8);
+        } else {
+            this._id = value;
+        }
+
+        this.active = this._id !== 0;
+    }
+
+    get active() {
+        return this._active;
+    }
+
+    set active(value) {
+        if (value !== this._active) {
+            // 인접 블록 렌더링 업데이트 필요
+        }
+
+        this._active = value;
+    }
+
     static get Direction() {
         return Direction;
     }
+
+    static getDirectionVector = getDirectionVector;
 
     constructor(
         chunk,
         id = 0,
         coordinate = new THREE.Vector3(0, 0, 0),
-        direction = Direction.Up
+        direction = Direction.Front
     ) {
         this.chunk = chunk;
         this.id = id;
@@ -105,64 +103,56 @@ export class Block {
         this.direction = direction;
     }
 
-    setId(id) {
-        this.id = id;
+    /**
+     * direction 방향에 맞닿은 블록을 가져옵니다.
+     * @param {number} direction
+     * @returns {Block} direction 방향으로 맞닿은 블록
+     */
+    getNearBlock(direction) {
+        const directionVector = getDirectionVector(direction);
+        const targetCoordinate = this.coordinate.clone().add(directionVector);
 
-        if (this.instance) {
-            const uvs = getUVCoordinate(this.id, 16);
-            this.geometry.setAttribute(
-                "uv",
-                new THREE.Float32BufferAttribute(uvs, 2)
-            );
-        }
+        const x = targetCoordinate.x;
+        const y = targetCoordinate.y;
+        const z = targetCoordinate.z;
+
+        return this.chunk.world.getBlock(x, y, z);
     }
 
-    load() {
-        this.geometry = new THREE.BoxGeometry();
-        const originalIndices = this.geometry.getIndex().array;
-        const indices = [];
+    /**
+     * Block의 렌더링 정보를 생성합니다. 렌더링 정보는 Block의 각 face 별로 생성됩니다.
+     * @returns {object[]} 렌더링 정보
+     */
+    getRenderInfos() {
+        const infos = [];
 
-        for (let i = 0; i < 6; i++) {
-            const nearBlock = getNearBlock(this.chunk, this.coordinate, i);
-
-            if (nearBlock !== null) {
-                if (nearBlock.id !== 0) {
-                    continue;
-                }
-            }
-
-            for (let j = 0; j < 6; j++) {
-                indices.push(originalIndices[i * 6 + j]);
-            }
+        // 비활성화된 블록은 렌더링하지 않음
+        if (this.active === false) {
+            return [];
         }
 
-        if (indices.length === 0) {
-            return null;
+        for (let direction = 0; direction < 6; direction++) {
+            const block = this.getNearBlock(direction);
+
+            // 블록의 face가 world border를 가리키는 경우 - 렌더링하지 않음
+            // if (block === null) {
+            //     continue;
+            // }
+
+            // 블록의 face가 다른 active 블록과 맞닿은 경우 - 렌더링하지 않음
+            if (block?.active === true) {
+                continue;
+            }
+
+            infos.push({
+                coordinate: this.coordinate,
+                direction: direction,
+
+                // TODO: block id에 따라 각 direction face별로 다른 텍스쳐 사용
+                texture: this.id,
+            });
         }
 
-        this.geometry.setIndex(indices);
-
-        const uvs = getUVCoordinate(this.id, 16);
-        this.geometry.setAttribute(
-            "uv",
-            new THREE.Float32BufferAttribute(uvs, 2)
-        );
-
-        this.material = new THREE.ShaderMaterial({
-            uniforms: {
-                textureImage: {
-                    value: RinEngine.texture,
-                },
-            },
-            vertexShader: blockVertexShader,
-            fragmentShader: blockFragmentShader,
-        });
-
-        this.instance = new THREE.Mesh(this.geometry, this.material);
-        this.instance.position.add(this.coordinate);
-
-        return this.instance;
+        return infos;
     }
-
-    unload() {}
 }
