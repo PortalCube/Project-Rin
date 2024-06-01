@@ -20,6 +20,11 @@ export class GameScene extends RinScene {
      */
     sky = null;
 
+    /**
+     * @type {World}
+     */
+    world = null;
+
     constructor() {
         super();
     }
@@ -32,8 +37,8 @@ export class GameScene extends RinScene {
         this.scene.background = new THREE.Color(0x000000);
 
         // 새로운 World 생성
-        const world = new World(this);
-        world.generate(32, MAP_HEIGHT);
+        this.world = new World(this);
+        this.world.generate(32, MAP_HEIGHT);
 
         // Player 생성
         this.player = new Player(this);
@@ -43,9 +48,8 @@ export class GameScene extends RinScene {
         this.sky = new Sky(this);
         this.scene.add(this.sky.instance);
 
-        // World를 Scene에 추가
-        const mesh = world.render(this.player);
-        this.scene.add(mesh);
+        // World의 Mesh를 만들어서 Scene에 render
+        this.world.render();
 
         Log.info("GameScene Loaded");
     }

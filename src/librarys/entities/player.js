@@ -6,8 +6,21 @@ import { RinInput } from "../input.js";
 import { clamp, rotateVector3 } from "../util.js";
 import { Entity } from "./entity.js";
 
+import selectionVertexShader from "../../assets/shaders/selection.vert?raw";
+import selectionFragmentShader from "../../assets/shaders/selection.frag?raw";
+import { raycast } from "../raycast.js";
+
 const MIN_VERTICAL_ANGLE_VALUE = Math.PI / -2;
 const MAX_VERTICAL_ANGLE_VALUE = Math.PI / 2;
+
+const selection = new THREE.Mesh(
+    new THREE.BoxGeometry(1.001, 1.001, 1.001),
+    new THREE.ShaderMaterial({
+        vertexShader: selectionVertexShader,
+        fragmentShader: selectionFragmentShader,
+        transparent: true,
+    })
+);
 
 export class Player extends Entity {
     /**
@@ -52,28 +65,51 @@ export class Player extends Entity {
         this.instance = scene.camera;
         this.instance.position.z = 3;
         this.instance.position.y = GROUND_LEVEL + 2;
+
+        this.scene.scene.add(selection);
     }
 
     onFrameUpdate(deltaTime) {
         // Log.info("카메라 프레임 업데이트", deltaTime);
 
-        this.handleLook(deltaTime);
-        this.handleMovement(deltaTime);
+        // 카메라 이동
+        this.cameraMovement(deltaTime);
 
+        // 플레이어 이동
+        this.playerMovement(deltaTime);
+
+        const pointingBlock = this.getPointingBlock();
+
+        if (RinInput.getPointerDown(2)) {
+            Log.info(pointingBlock.point);
+        }
+
+        if (pointingBlock) {
+            selection.position.copy(pointingBlock.coordinate);
+
+            if (RinInput.getPointerDown(0)) {
+                const x = pointingBlock.coordinate.x;
+                const y = pointingBlock.coordinate.y;
+                const z = pointingBlock.coordinate.z;
+
+                this.scene.world.setBlock(x, y, z, 0);
+            }
+        }
+
+        // 디버그 로그 띄우기
         if (RinInput.getKeyDown("Backquote")) {
             Log.info(this.instance.position);
             Log.info(RinEngine.renderer.info);
             Log.info(RinEngine.renderer.info.render);
         }
 
+        // 포인터 잠금 toggle
         if (RinInput.getKeyDown("Space")) {
             RinInput.setPointerLock(!RinInput.pointerLock);
         }
-
-        // Log.info(RinInput.wheelDelta);
     }
 
-    handleMovement(deltaTime) {
+    playerMovement(deltaTime) {
         const inputDirection = new THREE.Vector3(0, 0, 0);
         let runSpeed = 1;
 
@@ -121,7 +157,7 @@ export class Player extends Entity {
         this.instance.position.add(vec);
     }
 
-    handleLook(deltaTime) {
+    cameraMovement(deltaTime) {
         const dx = RinInput.pointerPosition.dx;
         const dy = RinInput.pointerPosition.dy;
 
@@ -141,4 +177,48 @@ export class Player extends Entity {
         this.instance.rotateY(this.horizontalAngle);
         this.instance.rotateX(this.verticalAngle);
     }
+
+    /**
+     * 현재 바라보고 있는 블록의 좌표를 반환합니다.
+     * 블록을 파괴할 때 유용합니다.
+     * @returns {THREE.Vector3}
+     */
+    getPointingBlock() {
+        if (this.scene.world.mesh === null) {
+            return null;
+        }
+
+        // const raycaster = new THREE.Raycaster(
+        //     this.instance.position,
+        //     this.instance.getWorldDirection(new THREE.Vector3()),
+        //     0,
+        //     15
+        // );
+
+        // raycaster.setFromCamera({ x: 0, y: 0 }, this.instance);
+
+        // const intersects = raycaster.intersectObject(this.scene.world.mesh);
+
+        const position = this.instance.position;
+        const direction = this.instance.getWorldDirection(new THREE.Vector3());
+
+        const intersect = raycast(this.scene.world, position, direction);
+
+        if (intersect === null) {
+            return null;
+        }
+
+        const point = intersect.point;
+        const distance = intersect.distance;
+        const coordinate = intersect.coordinate;
+
+        return { point, distance, coordinate };
+    }
+
+    /**
+     * 현재 바라보고 있는 빈 공간의 좌표를 반환합니다.
+     * 블록을 설치할 때 유용합니다.
+     * @returns {THREE.Vector3}
+     */
+    getPointingSpace() {}
 }

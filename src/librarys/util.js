@@ -93,3 +93,25 @@ export function rotateVector3(vector, angle) {
 export function randomRange(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+/**
+ * number의 소수 부분을 반환합니다.
+ * @param {number} value
+ * @returns {number}
+ */
+export function getDecimal(value) {
+    return value % 1;
+}
+
+// /**
+//  * point를 block coordinate로 clamp합니다.
+//  * @param {THREE.Vector3} point
+//  * @param {THREE.Vector3} coordinate
+//  */
+// export function clampToBlock(point, coordinate) {
+//     const x = clamp(point.x, coordinate.x - 0.5, coordinate.x + 0.5);
+//     const y = clamp(point.y, coordinate.y - 0.5, coordinate.y + 0.5);
+//     const z = clamp(point.z, coordinate.z - 0.5, coordinate.z + 0.5);
+
+//     return new THREE.Vector3(x, y, z);
+// }

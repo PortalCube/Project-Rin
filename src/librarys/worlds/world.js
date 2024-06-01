@@ -1,12 +1,7 @@
 import * as THREE from "three";
 import { Log } from "../log.js";
 import { CHUNK_SIZE, GROUND_LEVEL, MAP_HEIGHT } from "../setting.js";
-import {
-    getChunkCoordinate,
-    getChunkIndex,
-    getMinMax,
-    randomRange,
-} from "../util.js";
+import { getChunkCoordinate, getChunkIndex, getMinMax } from "../util.js";
 import { Chunk } from "./chunk.js";
 import { Block, Direction } from "./block.js";
 import { RinEngine } from "../engine.js";
@@ -32,6 +27,16 @@ export class World {
      * @type {Chunk[][]} [x][z]
      */
     chunks = [];
+
+    /**
+     * @type {THREE.InstancedMesh}
+     */
+    mesh = null;
+
+    /**
+     * @type {object[]} 렌더링 정보 배열
+     */
+    renderInfos = [];
 
     width = 0;
     height = 0;
@@ -82,7 +87,8 @@ export class World {
 
         for (let x = this.minWorldValue; x <= this.maxWorldValue; x++) {
             for (let z = this.minWorldValue; z <= this.maxWorldValue; z++) {
-                const level = randomRange(GROUND_LEVEL - 5, GROUND_LEVEL);
+                const level = GROUND_LEVEL;
+                // const level = randomRange(GROUND_LEVEL - 5, GROUND_LEVEL);
                 for (let y = 0; y < this.depth; y++) {
                     // GROUND_LEVEL 미만의 y좌표는 돌로 채우기
                     // GROUND_LEVEL의 y좌표는 잔디로 채우기
@@ -104,11 +110,11 @@ export class World {
 
     /**
      * World의 렌더링 정보를 생성합니다.
-     * @param {Player} player
      * @param {number} distance
      * @returns {object[]} 렌더링 정보 배열
      */
-    getRenderInfos(player, distance = 50) {
+    getRenderInfos(distance = 15) {
+        const player = this.scene.player;
         const playerPosition = player.blockPosition;
         const playerChunkPosition = this.getChunk(
             playerPosition.x,
@@ -147,13 +153,16 @@ export class World {
 
     /**
      * World의 InstanceMesh를 생성합니다.
-     * @param {Player} player 플레이어 객체
      * @param {number} distance 렌더링 거리
      * @returns {THREE.InstancedMesh} InstancedMesh
      */
-    render(player, distance = 15) {
+    render(distance = 15) {
+        const time = performance.now();
+
         // 렌더링할 블록에 대한 정보를 저장
-        const infos = this.getRenderInfos(player, distance);
+        const infos = this.getRenderInfos(distance);
+
+        Log.info(`World Render Time: ${performance.now() - time}ms`);
 
         if (infos.length < 1) {
             return;
@@ -253,13 +262,20 @@ export class World {
             new THREE.InstancedBufferAttribute(new Float32Array(uvOffsets), 2)
         );
 
+        if (this.mesh) {
+            this.mesh.geometry.dispose();
+            this.mesh.material.dispose();
+
+            this.scene.scene.remove(this.mesh);
+        }
+
+        this.renderInfos = infos;
+
+        this.mesh = mesh;
+        this.scene.scene.add(mesh);
+
         return mesh;
     }
-
-    /**
-     * 변경사항에 대해 렌더링을 업데이트합니다.
-     */
-    updateRender() {}
 
     /**
      * x, z world 좌표가 가리키는 청크를 구합니다.
@@ -310,22 +326,21 @@ export class World {
     }
 
     /**
-     * x, y, z world 좌표가 가리키는 블록을 지정합니다.
+     * x, y, z world 좌표가 가리키는 블록의 id를 지정합니다.
      * @param {number} x
      * @param {number} y
      * @param {number} z
-     * @param {Block} block world 좌표에 지정할 블록
+     * @param {number} id 블록 id
      */
-    setBlock(x, y, z, block) {
-        const chunk = this.getChunk(x, z);
+    setBlock(x, y, z, id) {
+        const block = this.getBlock(x, y, z);
 
-        if (!chunk) {
-            return;
+        if (block) {
+            block.id = id;
+
+            if (this.mesh) {
+                this.render();
+            }
         }
-
-        const _x = getChunkCoordinate(x, CHUNK_SIZE);
-        const _z = getChunkCoordinate(z, CHUNK_SIZE);
-
-        chunk.setBlock(_x, y, _z, block);
     }
 }
