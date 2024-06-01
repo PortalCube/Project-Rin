@@ -4,20 +4,16 @@ import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
 import { RinInput } from "../input.js";
 import { clamp, rotateVector3 } from "../util.js";
+import { Entity } from "./entity.js";
 
 const MIN_VERTICAL_ANGLE_VALUE = Math.PI / -2;
 const MAX_VERTICAL_ANGLE_VALUE = Math.PI / 2;
 
-export class Player {
+export class Player extends Entity {
     /**
      * @type {THREE.PerspectiveCamera}
      */
     instance = null;
-
-    /**
-     * @type {RinScene}
-     */
-    scene = null;
 
     moveSpeed = 5;
     runSpeed = 7.5;
@@ -43,7 +39,7 @@ export class Player {
      * @param {RinScene} scene
      */
     constructor(scene) {
-        this.scene = scene;
+        super(scene);
 
         // 원근 투영 카메라를 생성하여 player의 main instance로 사용
         this.scene.camera = new THREE.PerspectiveCamera(
@@ -56,23 +52,6 @@ export class Player {
         this.instance = scene.camera;
         this.instance.position.z = 3;
         this.instance.position.y = GROUND_LEVEL + 2;
-
-        // 이벤트 등록
-        // arrow function을 사용하여 this의 context를 Player로 유지
-        scene.addEventListener("load", (event) => this.onLoad());
-        scene.addEventListener("update", (event) =>
-            this.onUpdate(event.deltaTime)
-        );
-        scene.addEventListener("frameUpdate", (event) =>
-            this.onFrameUpdate(event.deltaTime)
-        );
-        scene.addEventListener("unload", (event) => this.onUnload());
-    }
-
-    onLoad() {}
-
-    onUpdate(deltaTime) {
-        // Log.info("카메라 업데이트", deltaTime);
     }
 
     onFrameUpdate(deltaTime) {
@@ -93,8 +72,6 @@ export class Player {
 
         // Log.info(RinInput.wheelDelta);
     }
-
-    onUnload() {}
 
     handleMovement(deltaTime) {
         const inputDirection = new THREE.Vector3(0, 0, 0);
