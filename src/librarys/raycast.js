@@ -42,7 +42,7 @@ function getIntersectInfo(point, origin, rayDirection, axis) {
         direction = rayDirection.z > 0 ? Direction.Back : Direction.Front;
     }
 
-    if (direction) {
+    if (direction !== null) {
         normal = getDirectionVector(direction);
     }
 
@@ -50,6 +50,7 @@ function getIntersectInfo(point, origin, rayDirection, axis) {
         point,
         distance,
         coordinate,
+        direction,
         normal,
     };
 }

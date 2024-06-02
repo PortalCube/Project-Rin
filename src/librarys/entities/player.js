@@ -87,10 +87,6 @@ export class Player extends Entity {
 
         const pointingBlock = this.getPointingBlock();
 
-        if (RinInput.getPointerDown(2)) {
-            Log.info(pointingBlock.point);
-        }
-
         if (pointingBlock) {
             // cube.position.copy(pointingBlock.point);
             selection.position.copy(pointingBlock.coordinate);
@@ -101,6 +97,17 @@ export class Player extends Entity {
                 const z = pointingBlock.coordinate.z;
 
                 this.scene.world.setBlock(x, y, z, 0);
+            }
+
+            if (RinInput.getPointerDown(2)) {
+                const normal = pointingBlock.normal;
+                const coordinate = pointingBlock.coordinate.clone().add(normal);
+
+                const x = coordinate.x;
+                const y = coordinate.y;
+                const z = coordinate.z;
+
+                this.scene.world.setBlock(x, y, z, 1);
             }
         }
 
@@ -223,8 +230,9 @@ export class Player extends Entity {
                 const point = intersect.point;
                 const distance = intersect.distance;
                 const coordinate = intersect.coordinate;
+                const normal = intersect.normal;
 
-                return { point, distance, coordinate };
+                return { point, distance, coordinate, normal };
             }
         }
     }
