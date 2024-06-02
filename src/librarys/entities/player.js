@@ -22,6 +22,12 @@ const selection = new THREE.Mesh(
     })
 );
 
+const size = 0.25;
+const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(size, size, size),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 })
+);
+
 export class Player extends Entity {
     /**
      * @type {THREE.PerspectiveCamera}
@@ -66,6 +72,7 @@ export class Player extends Entity {
         this.instance.position.z = 3;
         this.instance.position.y = GROUND_LEVEL + 2;
 
+        // this.scene.scene.add(cube);
         this.scene.scene.add(selection);
     }
 
@@ -85,6 +92,7 @@ export class Player extends Entity {
         }
 
         if (pointingBlock) {
+            // cube.position.copy(pointingBlock.point);
             selection.position.copy(pointingBlock.coordinate);
 
             if (RinInput.getPointerDown(0)) {
@@ -202,17 +210,23 @@ export class Player extends Entity {
         const position = this.instance.position;
         const direction = this.instance.getWorldDirection(new THREE.Vector3());
 
-        const intersect = raycast(this.scene.world, position, direction);
+        const intersects = raycast(position, direction);
 
-        if (intersect === null) {
-            return null;
+        for (const intersect of intersects) {
+            const x = intersect.coordinate.x;
+            const y = intersect.coordinate.y;
+            const z = intersect.coordinate.z;
+
+            const block = this.scene.world.getBlock(x, y, z);
+
+            if (block && block.active) {
+                const point = intersect.point;
+                const distance = intersect.distance;
+                const coordinate = intersect.coordinate;
+
+                return { point, distance, coordinate };
+            }
         }
-
-        const point = intersect.point;
-        const distance = intersect.distance;
-        const coordinate = intersect.coordinate;
-
-        return { point, distance, coordinate };
     }
 
     /**

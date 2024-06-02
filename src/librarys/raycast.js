@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { getDecimal } from "./util.js";
+import { getHalfDecimal } from "./util.js";
 import { Direction, getDirectionVector } from "./worlds/block.js";
 
 // three.js에도 Raycaster가 구현되어 있지만, three.js의 Raycaster를 적용하면 Scene에 블록이 너무 많을때 성능이 급격히 떨어지는 이슈가 있었습니다.
@@ -14,16 +14,31 @@ import { Direction, getDirectionVector } from "./worlds/block.js";
  */
 function getIntersectInfo(point, origin, rayDirection, axis) {
     const distance = origin.distanceTo(point);
-    const coordinate = new THREE.Vector3(point.x, point.y, point.z).round();
+    const coordinate = new THREE.Vector3(point.x, point.y, point.z);
 
     let normal = null;
     let direction = null;
 
     if (axis === 0) {
+        coordinate.x =
+            rayDirection.x > 0 ? Math.ceil(point.x) : Math.floor(point.x);
+        coordinate.y = Math.round(point.y);
+        coordinate.z = Math.round(point.z);
+
         direction = rayDirection.x > 0 ? Direction.Left : Direction.Right;
     } else if (axis === 1) {
+        coordinate.x = Math.round(point.x);
+        coordinate.y =
+            rayDirection.y > 0 ? Math.ceil(point.y) : Math.floor(point.y);
+        coordinate.z = Math.round(point.z);
+
         direction = rayDirection.y > 0 ? Direction.Down : Direction.Up;
     } else if (axis === 2) {
+        coordinate.x = Math.round(point.x);
+        coordinate.y = Math.round(point.y);
+        coordinate.z =
+            rayDirection.z > 0 ? Math.ceil(point.z) : Math.floor(point.z);
+
         direction = rayDirection.z > 0 ? Direction.Back : Direction.Front;
     }
 
@@ -41,11 +56,10 @@ function getIntersectInfo(point, origin, rayDirection, axis) {
 
 /**
  * Raycast를 수행합니다.
- * @param {World} world
  * @param {THREE.Vector3} position
  * @param {THREE.Vector3} direction
  */
-export function raycast(world, position, direction, depth = 30) {
+export function raycast(position, direction, depth = 100) {
     const rx = direction.x;
     const ry = direction.y;
     const rz = direction.z;
@@ -54,10 +68,16 @@ export function raycast(world, position, direction, depth = 30) {
     const py = position.y;
     const pz = position.z;
 
-    const pxDecimal = getDecimal(px);
-    const pyDecimal = getDecimal(py);
-    const pzDecimal = getDecimal(pz);
+    const rxSign = Math.sign(rx);
+    const rySign = Math.sign(ry);
+    const rzSign = Math.sign(rz);
 
+    // direction의 방향에 따라 0.5로 올림 혹은 -0.5로 내림한 값
+    const pxDecimal = getHalfDecimal(px, rxSign) - px;
+    const pyDecimal = getHalfDecimal(py, rySign) - py;
+    const pzDecimal = getHalfDecimal(pz, rzSign) - pz;
+
+    // 각 x, y, z절편에서 다음 x, y, z 절편으로 가는 벡터
     const xVector = rx
         ? direction.clone().multiplyScalar(1 / Math.abs(rx))
         : null;
@@ -68,10 +88,13 @@ export function raycast(world, position, direction, depth = 30) {
         ? direction.clone().multiplyScalar(1 / Math.abs(rz))
         : null;
 
-    const xSideDist = rx > 0 ? 1 - pxDecimal : pxDecimal;
-    const ySideDist = ry > 0 ? 1 - pyDecimal : pyDecimal;
-    const zSideDist = rz > 0 ? 1 - pzDecimal : pzDecimal;
+    // 양수 방향은 pxDecimal을, 음수 방향의 경우에는 -pxDecimal을 사용해야함
+    // 그런데 음수 방향은 이미 xVector가 음수이므로 두 경우 모두 Math.abs(pxDecimal)을 사용
+    const xSideDist = Math.abs(pxDecimal);
+    const ySideDist = Math.abs(pyDecimal);
+    const zSideDist = Math.abs(pzDecimal);
 
+    // 현재 position에서 direction 방향의 ray가 처음으로 만나는 x, y, z절편으로 가는 벡터
     const xSideDistVector = rx
         ? xVector.clone().multiplyScalar(xSideDist)
         : null;
@@ -82,6 +105,7 @@ export function raycast(world, position, direction, depth = 30) {
         ? zVector.clone().multiplyScalar(zSideDist)
         : null;
 
+    // Ray가 처음으로 만나는 x, y, z절편의 좌표
     const xPoint = xSideDistVector
         ? position.clone().add(xSideDistVector)
         : null;
@@ -132,19 +156,8 @@ export function raycast(world, position, direction, depth = 30) {
         }
     }
 
+    // intersects를 distance 순으로 정렬
     intersects.sort((a, b) => a.distance - b.distance);
 
-    for (const intersect of intersects) {
-        const x = intersect.coordinate.x;
-        const y = intersect.coordinate.y;
-        const z = intersect.coordinate.z;
-
-        const block = world.getBlock(x, y, z);
-
-        if (block && block.active) {
-            return intersect;
-        }
-    }
-
-    return null;
+    return intersects;
 }

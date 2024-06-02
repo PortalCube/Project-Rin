@@ -103,6 +103,18 @@ export function getDecimal(value) {
     return value % 1;
 }
 
+/**
+ * number를 0.5로 올림 혹은 내림합니다.
+ * @param {number} value
+ * @param {number} sign 올림 혹은 내림 방향
+ * @returns {number}
+ */
+export function getHalfDecimal(value, sign) {
+    return sign < 0
+        ? Math.floor(value - 0.5) + 0.5
+        : Math.ceil(value - 0.5) + 0.5;
+}
+
 // /**
 //  * point를 block coordinate로 clamp합니다.
 //  * @param {THREE.Vector3} point
