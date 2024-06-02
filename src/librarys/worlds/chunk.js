@@ -63,20 +63,21 @@ export class Chunk {
 
     /**
      * Chunk의 렌더링 정보를 생성합니다.
-     * @returns {object[]} 렌더링 정보
+     * @param {Map} infos 렌더링 정보
+     * @returns {number} 렌더링 크기
      */
-    getRenderInfos() {
-        const infos = [];
+    getRenderInfos(infos) {
+        let count = 0;
 
         for (const yList of this.blocks) {
             for (const zList of yList) {
                 for (const block of zList) {
-                    infos.push(...block.getRenderInfos());
+                    count += block.getRenderInfos(infos);
                 }
             }
         }
 
-        return infos;
+        return count;
     }
 
     /**

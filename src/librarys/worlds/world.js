@@ -1,21 +1,17 @@
 import * as THREE from "three";
 import { Log } from "../log.js";
-import { CHUNK_SIZE, GROUND_LEVEL, MAP_HEIGHT } from "../setting.js";
+import {
+    CHUNK_SIZE,
+    GROUND_LEVEL,
+    MAP_HEIGHT,
+    TILE_MAP_SIZE,
+} from "../setting.js";
 import { getChunkCoordinate, getChunkIndex, getMinMax } from "../util.js";
 import { Chunk } from "./chunk.js";
-import { Block, Direction } from "./block.js";
 import { RinEngine } from "../engine.js";
 
 import blockVertexShader from "../../assets/shaders/block.vert?raw";
 import blockFragmentShader from "../../assets/shaders/block.frag?raw";
-
-function getUVOffset(id, tileSize = 16) {
-    const size = 1 / tileSize;
-    const x = (id % tileSize) * size;
-    const y = (tileSize - Math.floor(id / tileSize) - 1) * size;
-
-    return [x, y];
-}
 
 export class World {
     /**
@@ -34,9 +30,14 @@ export class World {
     mesh = null;
 
     /**
-     * @type {object[]} 렌더링 정보 배열
+     * @type {Map} 렌더링 정보 배열
      */
-    renderInfos = [];
+    renderInfos = null;
+
+    /**
+     * @type {number} 렌더링 정보 갯수
+     */
+    renderCount = 0;
 
     width = 0;
     height = 0;
@@ -110,10 +111,11 @@ export class World {
 
     /**
      * World의 렌더링 정보를 생성합니다.
+     * @param {Map} infos 렌더링 정보
      * @param {number} distance
-     * @returns {object[]} 렌더링 정보 배열
+     * @returns {number} 렌더링 크기
      */
-    getRenderInfos(distance = 15) {
+    getRenderInfos(infos, distance = 15) {
         const player = this.scene.player;
         const playerPosition = player.blockPosition;
         const playerChunkPosition = this.getChunk(
@@ -132,7 +134,7 @@ export class World {
         const minZIndex = minZ - this.minChunkValue;
         const maxZIndex = minZIndex + renderDistance * 2;
 
-        const infos = [];
+        let count = 0;
 
         for (let x = minXIndex; x <= maxXIndex; x++) {
             if (x < 0 || x >= this.chunks.length) continue;
@@ -143,50 +145,61 @@ export class World {
                 const chunk = this.chunks[x][z];
 
                 if (chunk) {
-                    infos.push(...chunk.getRenderInfos());
+                    count += chunk.getRenderInfos(infos);
                 }
             }
         }
 
-        return infos;
+        return count;
     }
 
     /**
-     * World의 InstanceMesh를 생성합니다.
+     * World의 렌더링 정보와 InstancedMesh를 생성하고 반환합니다.
      * @param {number} distance 렌더링 거리
      * @returns {THREE.InstancedMesh} InstancedMesh
      */
-    render(distance = 15) {
-        const time = performance.now();
+    render(distance = 30) {
+        // 렌더링 정보를 저장할 Map을 생성
+        this.renderInfos = new Map();
 
         // 렌더링할 블록에 대한 정보를 저장
-        const infos = this.getRenderInfos(distance);
+        this.renderCount = this.getRenderInfos(this.renderInfos, distance);
 
-        Log.info(`World Render Time: ${performance.now() - time}ms`);
-
-        if (infos.length < 1) {
+        // 렌더링 정보가 없다면 렌더링하지 않음
+        if (this.renderCount < 1) {
             return;
         }
 
         // infos 배열로 InstancedMesh를 만들어서 Scene에 렌더링
-        const geometry = new THREE.PlaneGeometry();
-        const instancedGeometry = new THREE.InstancedBufferGeometry();
+        return this.buildMesh();
+    }
 
-        // InstancedBufferGeometry에 PlaneGeometry의 attribute를 복사
+    /**
+     * World의 렌더링 정보로 InstancedMesh를 만들어서 Scene에 렌더링합니다.
+     */
+    buildMesh() {
+        const planeGeometry = new THREE.PlaneGeometry();
+        const geometry = new THREE.InstancedBufferGeometry();
 
-        instancedGeometry.setAttribute(
-            "position",
-            geometry.attributes.position
-        );
-        instancedGeometry.setAttribute("normal", geometry.attributes.normal);
-        instancedGeometry.index = geometry.index;
+        // InstancedBufferGeometry에 PlaneGeometry의 attribute들을 복사
+        geometry.setAttribute("position", planeGeometry.attributes.position);
+        geometry.setAttribute("normal", planeGeometry.attributes.normal);
+        geometry.index = planeGeometry.index;
 
-        const uvs = [0, 0.0625, 0.0625, 0.0625, 0, 0, 0.0625, 0];
-        instancedGeometry.setAttribute(
-            "uv",
-            new THREE.Float32BufferAttribute(uvs, 2)
-        );
+        // UV
+        const uvs = [
+            0,
+            1 / TILE_MAP_SIZE,
+            1 / TILE_MAP_SIZE,
+            1 / TILE_MAP_SIZE,
+            0,
+            0,
+            1 / TILE_MAP_SIZE,
+            0,
+        ];
+        geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
 
+        // ShaderMaterial을 생성하고 blockShader, textureImage 적용
         const material = new THREE.ShaderMaterial({
             uniforms: {
                 textureImage: {
@@ -198,66 +211,26 @@ export class World {
         });
 
         const mesh = new THREE.InstancedMesh(
-            instancedGeometry,
+            geometry,
             material,
-            infos.length
+            this.renderCount
         );
 
-        const PI_2 = Math.PI / 2;
         const uvOffsets = [];
+        let index = 0;
 
-        for (let i = 0; i < infos.length; i++) {
-            const info = infos[i];
-            const matrix = new THREE.Matrix4();
-            const directionVector = Block.getDirectionVector(info.direction);
+        for (const renderBlockInfo of this.renderInfos.values()) {
+            for (const info of renderBlockInfo.infos) {
+                // index번째 instance에 instanceMatrix를 지정
+                mesh.setMatrixAt(index++, info.matrix);
 
-            // instanceMatrix를 계산
-            // 행렬곱은 아래부터 위로 역순으로 적용
-
-            // (3) block의 world coordinate으로 translation
-            matrix.multiply(
-                new THREE.Matrix4().makeTranslation(info.coordinate)
-            );
-
-            // (2) block의 face의 위치로 translation
-            matrix.multiply(
-                new THREE.Matrix4().makeTranslation(
-                    directionVector.multiplyScalar(0.5)
-                )
-            );
-
-            // (1) block의 face의 방향으로 rotation
-            switch (info.direction) {
-                case Direction.Right:
-                    matrix.multiply(new THREE.Matrix4().makeRotationY(PI_2));
-                    break;
-                case Direction.Left:
-                    matrix.multiply(new THREE.Matrix4().makeRotationY(-PI_2));
-                    break;
-                case Direction.Up:
-                    matrix.multiply(new THREE.Matrix4().makeRotationX(-PI_2));
-                    break;
-                case Direction.Down:
-                    matrix.multiply(new THREE.Matrix4().makeRotationX(PI_2));
-                    break;
-                case Direction.Front:
-                    break;
-                case Direction.Back:
-                    matrix.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
-                    break;
+                // uvOffset 정보를 배열에 넣기
+                uvOffsets.push(...info.uvOffset);
             }
-
-            // 4. mesh의 i번 instance에 instanceMatrix를 지정
-            mesh.setMatrixAt(i, matrix);
-
-            // 블록 uv coordinate offset을 계산
-            const uvOffset = getUVOffset(info.texture, 16);
-
-            // uvOffsets 배열에 push
-            uvOffsets.push(...uvOffset);
         }
 
-        instancedGeometry.setAttribute(
+        // 각 instance에 대한 uvOffset을 InstancedBufferAttribute로 추가
+        geometry.setAttribute(
             "uvOffset",
             new THREE.InstancedBufferAttribute(new Float32Array(uvOffsets), 2)
         );
@@ -269,12 +242,85 @@ export class World {
             this.scene.scene.remove(this.mesh);
         }
 
-        this.renderInfos = infos;
-
         this.mesh = mesh;
         this.scene.scene.add(mesh);
 
+        this.needRenderUpdate = false;
+
         return mesh;
+    }
+
+    /**
+     * World의 x, y, z 좌표의 렌더링을 업데이트합니다.
+     * @param {number} x
+     * @param {number} y
+     * @param {number} z
+     */
+    updateRender(x, y, z) {
+        const block = this.getBlock(x, y, z);
+
+        // World 경계 밖인 경우 - 업데이트하지 않음
+        if (block === null) {
+            return;
+        }
+
+        // 렌더링 정보 업데이트
+        const needUpdate = this._updateRender(block, true);
+
+        // 렌더링 정보가 변했다면, mesh를 새로 빌드
+        if (needUpdate) {
+            this.buildMesh();
+        }
+    }
+
+    /**
+     * World의 block의 렌더링을 업데이트합니다. (내부 함수)
+     * @param {Block} block
+     */
+    _updateRender(block, depth = 0) {
+        const key = `${block.coordinate.x}:${block.coordinate.y}:${block.coordinate.z}`;
+        const originalInfos = this.renderInfos.get(key);
+
+        // hash 구하기
+        let oldHash = originalInfos ? originalInfos.hash : 0;
+
+        // 블록의 새로운 렌더링 정보를 가져옴
+        const blockRenderInfos = block._getRenderInfos();
+
+        // 새로운 hash 구하기
+        let newHash = blockRenderInfos ? blockRenderInfos.hash : 0;
+
+        // hash가 같으면 업데이트하지 않음
+        if (oldHash === newHash) {
+            depth++;
+            if (depth > 2) {
+                return false;
+            }
+        }
+
+        // 렌더링 정보 업데이트
+        if (blockRenderInfos === null) {
+            this.renderInfos.delete(key);
+        } else {
+            this.renderInfos.set(key, blockRenderInfos);
+        }
+
+        let oldLength = originalInfos ? originalInfos.infos.length : 0;
+        let newLength = blockRenderInfos ? blockRenderInfos.infos.length : 0;
+
+        // 렌더링 정보 갯수 업데이트
+        this.renderCount += newLength - oldLength;
+
+        // 인접한 블록의 렌더링 정보도 업데이트
+        for (let direction = 0; direction < 6; direction++) {
+            const nearBlock = block.getNearBlock(direction);
+
+            if (nearBlock) {
+                this._updateRender(nearBlock, depth);
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -338,9 +384,11 @@ export class World {
         if (block) {
             block.id = id;
 
-            if (this.mesh) {
-                this.render();
-            }
+            const time = performance.now();
+
+            this.updateRender(x, y, z);
+
+            Log.info(`updateRender: ${performance.now() - time}ms`);
         }
     }
 }

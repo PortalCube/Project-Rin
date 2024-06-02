@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createEnum, randomRange } from "../util.js";
+import { TILE_MAP_SIZE } from "../setting.js";
 
 //prettier-ignore
 export const Direction = createEnum({
@@ -10,6 +11,8 @@ export const Direction = createEnum({
     Front: 4, // Z+
     Back:  5, // Z-
 });
+
+const PI_2 = Math.PI / 2;
 
 export function getDirectionVector(direction) {
     switch (direction) {
@@ -26,6 +29,14 @@ export function getDirectionVector(direction) {
         case Direction.Back:
             return new THREE.Vector3(0, 0, -1);
     }
+}
+
+function getUVOffset(id, tileSize = TILE_MAP_SIZE) {
+    const size = 1 / tileSize;
+    const x = (id % tileSize) * size;
+    const y = (tileSize - Math.floor(id / tileSize) - 1) * size;
+
+    return [x, y];
 }
 
 export class Block {
@@ -121,15 +132,30 @@ export class Block {
 
     /**
      * Block의 렌더링 정보를 생성합니다. 렌더링 정보는 Block의 각 face 별로 생성됩니다.
-     * @returns {object[]} 렌더링 정보
+     * @param {Map} infos 렌더링 정보
+     * @returns {number} 렌더링 크기
      */
-    getRenderInfos() {
-        const infos = [];
+    getRenderInfos(infos) {
+        const blockInfos = this._getRenderInfos();
 
+        if (blockInfos === null) {
+            return 0;
+        }
+
+        const key = `${this.coordinate.x}:${this.coordinate.y}:${this.coordinate.z}`;
+        infos.set(key, blockInfos);
+
+        return blockInfos.infos.length;
+    }
+
+    _getRenderInfos() {
         // 비활성화된 블록은 렌더링하지 않음
         if (this.active === false) {
-            return [];
+            return null;
         }
+
+        const blockRenderInfos = [];
+        let hash = 0;
 
         for (let direction = 0; direction < 6; direction++) {
             const block = this.getNearBlock(direction);
@@ -144,15 +170,64 @@ export class Block {
                 continue;
             }
 
-            infos.push({
-                coordinate: this.coordinate,
-                direction: direction,
+            // 블록 instance의 instanceMatrix를 계산
+            // 행렬곱은 아래부터 위로 역순으로 적용
 
-                // TODO: block id에 따라 각 direction face별로 다른 텍스쳐 사용
-                texture: this.id,
+            const matrix = new THREE.Matrix4();
+            const directionVector = Block.getDirectionVector(direction);
+
+            // (3) block의 world coordinate로 translation
+            matrix.multiply(
+                new THREE.Matrix4().makeTranslation(this.coordinate)
+            );
+
+            // (2) block의 face의 위치로 translation
+            matrix.multiply(
+                new THREE.Matrix4().makeTranslation(
+                    directionVector.multiplyScalar(0.5)
+                )
+            );
+
+            // (1) block의 face의 방향으로 rotation
+            switch (direction) {
+                case Direction.Right:
+                    matrix.multiply(new THREE.Matrix4().makeRotationY(PI_2));
+                    break;
+                case Direction.Left:
+                    matrix.multiply(new THREE.Matrix4().makeRotationY(-PI_2));
+                    break;
+                case Direction.Up:
+                    matrix.multiply(new THREE.Matrix4().makeRotationX(-PI_2));
+                    break;
+                case Direction.Down:
+                    matrix.multiply(new THREE.Matrix4().makeRotationX(PI_2));
+                    break;
+                case Direction.Front:
+                    break;
+                case Direction.Back:
+                    matrix.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+                    break;
+            }
+
+            hash += 1 << direction;
+
+            blockRenderInfos.push({
+                // coordinate: this.coordinate,
+                // direction: direction,
+
+                // 렌더링에 필수적인 정보
+                uvOffset: getUVOffset(this.id),
+                matrix: matrix,
             });
         }
 
-        return infos;
+        if (blockRenderInfos.length === 0) {
+            return null;
+        }
+
+        return {
+            hash: hash,
+            infos: blockRenderInfos,
+        };
     }
 }
