@@ -5,6 +5,8 @@ function getTime() {
 }
 
 export const Log = {
+    element: null,
+
     info: (...message) => {
         console.log(`[${getTime()}][INFO]`, ...message);
     },
@@ -14,7 +16,14 @@ export const Log = {
     error: (...message) => {
         console.error(`[${getTime()}][ERROR]`, ...message);
     },
-    Log: (...message) => {
+    log: (...message) => {
         console.Log(`[${getTime()}][Log]`, ...message);
+    },
+    watch: (message) => {
+        if (Log.element === null) {
+            return;
+        }
+
+        Log.element.textContent = message;
     },
 };

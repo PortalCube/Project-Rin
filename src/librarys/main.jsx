@@ -7,13 +7,18 @@ import { RinEngine, createScene } from "./engine.js";
 import { Log } from "./log.js";
 import { GameScene } from "./scenes/game.js";
 
+import * as THREE from "three";
 import Stats from "three/addons/libs/stats.module.js";
 
 /**
  * 주어진 canvas element에 게임을 생성합니다.
  * @param {HTMLCanvasElement} canvas
+ * @param {HTMLDivElement} debug
  */
-export async function createGame(canvas) {
+export async function createGame(canvas, debug) {
+    // 디버그 요소 등록
+    Log.element = debug;
+
     // 엔진 초기화 및 프레임 업데이트 시작
     createScene(canvas, GameScene);
 
@@ -34,3 +39,5 @@ export function useStats() {
 
     return <div ref={(ref) => ref.appendChild(RinEngine.stats.dom)}></div>;
 }
+
+window.THREE = THREE;
