@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { RinScene } from "./scene.js";
 import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
-import { FOV } from "../setting.js";
+import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR } from "../setting.js";
 
 export class DefaultScene extends RinScene {
     constructor() {
@@ -19,10 +19,10 @@ export class DefaultScene extends RinScene {
         this.scene.background = new THREE.Color(0x000000);
 
         this.camera = new THREE.PerspectiveCamera(
-            FOV,
+            CAMERA_FOV,
             RinEngine.ratio,
-            0.1,
-            1000
+            CAMERA_NEAR,
+            CAMERA_FAR
         );
 
         Log.info("DefaultScene Loaded");

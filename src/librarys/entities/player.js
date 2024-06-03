@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { FOV, GROUND_LEVEL } from "../setting.js";
+import {
+    CAMERA_FAR,
+    CAMERA_FOV,
+    CAMERA_NEAR,
+    GROUND_LEVEL,
+    PLAYER_SIZE,
+} from "../setting.js";
 import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
 import { RinInput } from "../input.js";
@@ -62,10 +68,10 @@ export class Player extends Entity {
 
         // 원근 투영 카메라를 생성하여 player의 main instance로 사용
         this.scene.camera = new THREE.PerspectiveCamera(
-            FOV,
+            CAMERA_FOV,
             RinEngine.ratio,
-            0.1,
-            1000
+            CAMERA_NEAR,
+            CAMERA_FAR
         );
 
         this.instance = scene.camera;
