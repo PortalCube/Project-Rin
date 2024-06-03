@@ -27,6 +27,9 @@ export class Entity {
         scene.addEventListener("frameUpdate", (event) =>
             this.onFrameUpdate(event.deltaTime)
         );
+        scene.addEventListener("fixedUpdate", (event) =>
+            this.onFixedUpdate(event.fixedDeltaTime)
+        );
         scene.addEventListener("unload", () => this.onUnload());
     }
 
@@ -35,6 +38,8 @@ export class Entity {
     onUpdate(deltaTime) {}
 
     onFrameUpdate(deltaTime) {}
+
+    onFixedUpdate(fixedDeltaTime) {}
 
     onUnload() {}
 }

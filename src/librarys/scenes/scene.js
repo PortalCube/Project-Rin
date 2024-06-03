@@ -38,6 +38,15 @@ export class RinScene extends THREE.EventDispatcher {
         this.dispatchEvent({ type: "frameUpdate", scene: this, deltaTime });
     }
 
+    // 고정된 시간으로 호출됩니다.
+    onFixedUpdate(fixedDeltaTime) {
+        this.dispatchEvent({
+            type: "fixedUpdate",
+            scene: this,
+            fixedDeltaTime,
+        });
+    }
+
     // Scene이 언로드되었을 때 호출됩니다.
     onUnload() {
         this.dispatchEvent({ type: "unload", scene: this });

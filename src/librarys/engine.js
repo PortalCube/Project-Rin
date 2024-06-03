@@ -43,6 +43,7 @@ export const RinEngine = {
 
     enableGameUpdate: true,
     enableSceneUpdate: true,
+    enableFixedUpdate: true,
 
     /*
      * framePerSecond
@@ -53,10 +54,15 @@ export const RinEngine = {
      *  - RinEngine이 게임 로직(onUpdate)을 1초당 얼마나 처리할지 결정
      *  - 농작물의 성장, 문의 열림 닫힘, 청크 생성 등 모든 게임 로직은 TPS의 빈도로 처리
      *
-     *  두 값 모두 0으로 설정시 모니터 주사율에 맞추어 최대한 자주 업데이트
+     * fixedTimeStep
+     *  - RinEngine이 물리 로직(onFixedUpdate)을 얼마나 자주 처리할지 결정
+     *  - 플레이어의 충돌 및 이동은 이 빈도로 처리합니다.
+     *
+     *  이 값들은 0으로 설정시 모니터 주사율에 맞추어 최대한 자주 업데이트
      */
     framePerSecond: 0,
     tickPerSecond: 60,
+    fixedTimeStep: 120,
 
     // ## Frame Update Variables
     _latestUpdateTime: performance.now(),
@@ -69,12 +75,19 @@ export const RinEngine = {
     _tickElapsedTime: 0,
     _latestTickUpdateTime: performance.now(),
 
+    // ## Fixed Update Variables
+    _fixedElapsedTime: 0,
+
     get _frameInterval() {
         return this.framePerSecond > 0 ? 1000 / this.framePerSecond : 0;
     },
 
     get _tickInterval() {
         return this.tickPerSecond > 0 ? 1000 / this.tickPerSecond : 0;
+    },
+
+    get _fixedInterval() {
+        return this.fixedTimeStep > 0 ? 1000 / this.fixedTimeStep : 0;
     },
 };
 
@@ -132,33 +145,39 @@ function frameUpdate(currentTime) {
     }
 
     // ----- Scene Update -----
-    if (RinEngine.enableSceneUpdate === false) {
-        RinEngine._latestFrameUpdateTime = currentTime;
-        requestAnimationFrame(frameUpdate);
-        return;
-    }
+    if (RinEngine.enableSceneUpdate) {
+        RinEngine._frameElapsedTime += deltaTime;
 
-    RinEngine._frameElapsedTime += deltaTime;
+        if (RinEngine._frameElapsedTime >= RinEngine._frameInterval) {
+            sceneUpdate(currentTime - RinEngine._latestFrameUpdateTime);
+            RinEngine._frameElapsedTime -= RinEngine._frameInterval;
+        }
 
-    if (RinEngine._frameElapsedTime >= RinEngine._frameInterval) {
-        sceneUpdate(currentTime - RinEngine._latestFrameUpdateTime);
         RinEngine._latestFrameUpdateTime = currentTime;
-        RinEngine._frameElapsedTime -= RinEngine._frameInterval;
     }
 
     // ----- Game Update -----
-    if (RinEngine.enableGameUpdate === false) {
+    if (RinEngine.enableGameUpdate) {
+        RinEngine._tickElapsedTime += deltaTime;
+
+        if (RinEngine._tickElapsedTime >= RinEngine._tickInterval) {
+            gameUpdate(currentTime - RinEngine._latestTickUpdateTime);
+            RinEngine._tickElapsedTime -= RinEngine._tickInterval;
+        }
+
         RinEngine._latestTickUpdateTime = currentTime;
-        requestAnimationFrame(frameUpdate);
-        return;
     }
 
-    RinEngine._tickElapsedTime += deltaTime;
+    // ----- Fixed Update -----
+    if (RinEngine.enableFixedUpdate) {
+        RinEngine._fixedElapsedTime += deltaTime;
 
-    if (RinEngine._tickElapsedTime >= RinEngine._tickInterval) {
-        gameUpdate(currentTime - RinEngine._latestTickUpdateTime);
-        RinEngine._latestTickUpdateTime = currentTime;
-        RinEngine._tickElapsedTime -= RinEngine._tickInterval;
+        let count = 0;
+
+        while (RinEngine._fixedElapsedTime >= RinEngine._fixedInterval) {
+            fixedUpdate(RinEngine._fixedInterval);
+            RinEngine._fixedElapsedTime -= RinEngine._fixedInterval;
+        }
     }
 
     requestAnimationFrame(frameUpdate);
@@ -197,5 +216,18 @@ function gameUpdate(deltaTime) {
 
     if (status === RinScene.SceneStatus.Loaded) {
         RinEngine.scene.onUpdate(deltaTime);
+    }
+}
+
+/**
+ * fixed time으로 호출되는 Game 업데이트 함수입니다.
+ */
+function fixedUpdate(fixedDeltaTime) {
+    fixedDeltaTime /= 1000;
+
+    const status = RinEngine.scene.status;
+
+    if (status === RinScene.SceneStatus.Loaded) {
+        RinEngine.scene.onFixedUpdate(fixedDeltaTime);
     }
 }

@@ -3,7 +3,7 @@ import {
     CAMERA_FAR,
     CAMERA_FOV,
     CAMERA_NEAR,
-    GROUND_LEVEL,
+    GROUND_MAX_LEVEL,
     PLAYER_SIZE,
 } from "../setting.js";
 import { RinEngine } from "../engine.js";
@@ -42,11 +42,6 @@ const geometry = new THREE.BoxGeometry(...PLAYER_SIZE);
 const wireframe = new THREE.WireframeGeometry(geometry);
 const line = new THREE.LineSegments(wireframe);
 
-/**
- * @type {THREE.Object3D[]}
- */
-let debugObject = [];
-
 export class Player extends Entity {
     /**
      * @type {THREE.PerspectiveCamera}
@@ -63,12 +58,13 @@ export class Player extends Entity {
     // 날아다닐때 속도 배수
     flySpeedModifier = 1.5;
 
-    // 키 입력으로
+    inputVector = new THREE.Vector3(0, 0, 0);
+
     moveSpeed = 10000;
-    maxSpeed = 500;
+    maxSpeed = 400;
     maxRunSpeed = 1000;
-    maxFallSpeed = 2200;
-    jumpForce = 800;
+    maxFallSpeed = 3000;
+    jumpForce = 900;
     runSpeed = 2.5;
     lookSpeed = (Math.PI * 2) / 12;
 
@@ -80,7 +76,7 @@ export class Player extends Entity {
      */
     velocity = null;
     damping = 1 / (this.baseSpeed * 10);
-    gravity = 9.80665 * 2.5 * this.baseSpeed;
+    gravity = 9.80665 * 3 * this.baseSpeed;
 
     horizontalAngle = 0;
     verticalAngle = 0;
@@ -114,7 +110,7 @@ export class Player extends Entity {
 
         this.instance = scene.camera;
         this.instance.position.z = 3;
-        this.instance.position.y = GROUND_LEVEL + 8;
+        this.instance.position.y = GROUND_MAX_LEVEL + 1;
 
         this.velocity = new THREE.Vector3(0, 0, 0);
 
@@ -126,19 +122,6 @@ export class Player extends Entity {
     onFrameUpdate(deltaTime) {
         // Log.info("카메라 프레임 업데이트", deltaTime);
 
-        // 디버그 오브젝트 제거
-        debugObject.forEach((item) => {
-            if (item.geometry) {
-                item.geometry.dispose();
-            }
-
-            if (item.material) {
-                item.material.dispose();
-            }
-
-            this.scene.scene.remove(item);
-        });
-
         if (this.active === false) {
             return;
         }
@@ -146,14 +129,15 @@ export class Player extends Entity {
         // 카메라 이동
         this.cameraMovement(deltaTime);
 
-        // 플레이어 이동
-        this.playerMovement(deltaTime);
+        // 플레이어 이동 벡터 계산
+        this.inputVector = this.movementInput(deltaTime);
 
         const pointingBlock = this.getPointingBlock();
 
         if (pointingBlock && pointingBlock.distance < this.range) {
             axis.visible = true;
             selection.visible = true;
+
             axis.position.copy(pointingBlock.point);
             selection.position.copy(pointingBlock.coordinate);
 
@@ -181,7 +165,7 @@ export class Player extends Entity {
                 const y = coordinate.y;
                 const z = coordinate.z;
 
-                this.scene.world.setBlock(x, y, z, 1);
+                this.scene.world.setBlock(x, y, z, 6);
             }
         } else {
             axis.visible = false;
@@ -203,11 +187,17 @@ export class Player extends Entity {
         // fly mode toggle
         if (RinInput.getKeyDown("KeyO")) {
             this.fly = !this.fly;
+            this.jumpable = false;
         }
 
         line.position.copy(
             this.instance.position.clone().add(new THREE.Vector3(0, -0.5, 0))
         );
+    }
+
+    onFixedUpdate(fixedDeltaTime) {
+        // 플레이어 이동
+        this.playerMovement(fixedDeltaTime);
     }
 
     movementInput(deltaTime) {
@@ -280,18 +270,18 @@ export class Player extends Entity {
             maxSpeed *= this.flySpeedModifier;
         }
 
-        // 걸어다니는 경우, y 속도를 별도로 관리
+        // 걸어다니는 경우, y 가속도를 별도로 관리
         let _yVelocity = this.velocity.y;
 
-        // 걸어다니는 경우 y 속도를 별도로 관리
+        // 걸어다니는 경우 y 가속도를 별도로 관리
         if (this.fly === false) {
             // 걸어다니면 y에 중력 가속도 적용
             _yVelocity -= this.gravity * deltaTime;
 
-            // velocity 크기 제한시 y 속도를 포함하여 계산하지 않도록 y를 0으로
+            // velocity 크기 제한시 y 가속도를 포함하여 계산하지 않도록 y를 0으로
             this.velocity.y = 0;
 
-            // y 속도 제한
+            // y 가속도 제한
             if (Math.abs(_yVelocity) > this.maxFallSpeed) {
                 _yVelocity = Math.sign(_yVelocity) * this.maxFallSpeed;
             }
@@ -315,20 +305,17 @@ export class Player extends Entity {
             this.velocity.y = _yVelocity;
         }
 
-        // 낙하 중이면 점프 불가
-        if (this.velocity.y < -50) {
+        // y 가속도가 0이 아니면 점프 불가
+        if (this.velocity.y !== 0) {
             this.jumpable = false;
         }
 
         // 가속도를 플레이어 position에 적용
-        const v = this.velocity.clone();
+
         const vector = this.velocity
             .clone()
             .multiplyScalar((1 / this.baseSpeed) * deltaTime);
 
-        Log.watch(
-            `vel: (${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})\nspeed: ${v.length().toFixed(6)}`
-        );
         this.instance.position.add(vector);
 
         // 충돌 체크 및 처리
@@ -356,6 +343,19 @@ export class Player extends Entity {
 
             this.instance.position.add(inverse);
         }
+
+        const p = this.instance.position
+            .clone()
+            .add(new THREE.Vector3(0, -PLAYER_SIZE[1] * (3 / 4), 0));
+        const v = this.velocity.clone();
+        const messages = [
+            `pos: (${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)})`,
+            `vel: (${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`,
+            `speed: ${v.length().toFixed(6)}`,
+            `jumpable: ${this.jumpable}`,
+        ];
+
+        Log.watch(messages.join("\n"));
     }
 
     cameraMovement(deltaTime) {

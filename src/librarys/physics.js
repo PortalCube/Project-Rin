@@ -274,7 +274,13 @@ export function checkCollision(position, world) {
             const collision = getBlockCollision(position, coordinate);
 
             if (collision !== null) {
-                collisions.push(collision);
+                const sameNormalCollision = collisions.find((item) =>
+                    item.normal.equals(collision.normal)
+                );
+
+                if (sameNormalCollision === undefined) {
+                    collisions.push(collision);
+                }
             }
         }
     }
