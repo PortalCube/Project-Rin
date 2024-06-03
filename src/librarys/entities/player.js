@@ -9,12 +9,17 @@ import {
 import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
 import { RinInput } from "../input.js";
-import { clamp, rotateVector3 } from "../util.js";
+import { clamp, rotateVector3, round } from "../util.js";
 import { Entity } from "./entity.js";
 
 import selectionVertexShader from "../../assets/shaders/selection.vert?raw";
 import selectionFragmentShader from "../../assets/shaders/selection.frag?raw";
-import { raycast } from "../raycast.js";
+import {
+    checkCollision,
+    getBlockCollision,
+    getPlayerIntersectCoordinates,
+    worldRaycast,
+} from "../physics.js";
 
 const MIN_VERTICAL_ANGLE_VALUE = Math.PI / -2;
 const MAX_VERTICAL_ANGLE_VALUE = Math.PI / 2;
@@ -28,11 +33,19 @@ const selection = new THREE.Mesh(
     })
 );
 
-const size = 0.25;
-const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(size, size, size),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 })
-);
+// xyz axis line
+const axis = new THREE.AxesHelper(2);
+
+// create wireframe
+const geometry = new THREE.BoxGeometry(...PLAYER_SIZE);
+// const geometry = new THREE.CylinderGeometry(...PLAYER_SIZE);
+const wireframe = new THREE.WireframeGeometry(geometry);
+const line = new THREE.LineSegments(wireframe);
+
+/**
+ * @type {THREE.Object3D[]}
+ */
+let debugObject = [];
 
 export class Player extends Entity {
     /**
@@ -40,9 +53,34 @@ export class Player extends Entity {
      */
     instance = null;
 
-    moveSpeed = 5;
-    runSpeed = 7.5;
+    active = false;
+
+    range = 4;
+
+    // 1초에 1블록 이동하는 속도를 지정
+    baseSpeed = 100;
+
+    // 날아다닐때 속도 배수
+    flySpeedModifier = 1.5;
+
+    // 키 입력으로
+    moveSpeed = 10000;
+    maxSpeed = 500;
+    maxRunSpeed = 1000;
+    maxFallSpeed = 2200;
+    jumpForce = 800;
+    runSpeed = 2.5;
     lookSpeed = (Math.PI * 2) / 12;
+
+    fly = false;
+    jumpable = false;
+
+    /**
+     * @type {THREE.Vector3} 플레이어의 가속도
+     */
+    velocity = null;
+    damping = 1 / (this.baseSpeed * 10);
+    gravity = 9.80665 * 2.5 * this.baseSpeed;
 
     horizontalAngle = 0;
     verticalAngle = 0;
@@ -76,14 +114,34 @@ export class Player extends Entity {
 
         this.instance = scene.camera;
         this.instance.position.z = 3;
-        this.instance.position.y = GROUND_LEVEL + 2;
+        this.instance.position.y = GROUND_LEVEL + 8;
 
-        // this.scene.scene.add(cube);
+        this.velocity = new THREE.Vector3(0, 0, 0);
+
+        this.scene.scene.add(axis);
         this.scene.scene.add(selection);
+        this.scene.scene.add(line);
     }
 
     onFrameUpdate(deltaTime) {
         // Log.info("카메라 프레임 업데이트", deltaTime);
+
+        // 디버그 오브젝트 제거
+        debugObject.forEach((item) => {
+            if (item.geometry) {
+                item.geometry.dispose();
+            }
+
+            if (item.material) {
+                item.material.dispose();
+            }
+
+            this.scene.scene.remove(item);
+        });
+
+        if (this.active === false) {
+            return;
+        }
 
         // 카메라 이동
         this.cameraMovement(deltaTime);
@@ -93,8 +151,10 @@ export class Player extends Entity {
 
         const pointingBlock = this.getPointingBlock();
 
-        if (pointingBlock) {
-            // cube.position.copy(pointingBlock.point);
+        if (pointingBlock && pointingBlock.distance < this.range) {
+            axis.visible = true;
+            selection.visible = true;
+            axis.position.copy(pointingBlock.point);
             selection.position.copy(pointingBlock.coordinate);
 
             if (RinInput.getPointerDown(0)) {
@@ -109,12 +169,23 @@ export class Player extends Entity {
                 const normal = pointingBlock.normal;
                 const coordinate = pointingBlock.coordinate.clone().add(normal);
 
+                const intersects = getPlayerIntersectCoordinates(
+                    this.instance.position
+                );
+
+                if (intersects.some((item) => item.equals(coordinate))) {
+                    return;
+                }
+
                 const x = coordinate.x;
                 const y = coordinate.y;
                 const z = coordinate.z;
 
                 this.scene.world.setBlock(x, y, z, 1);
             }
+        } else {
+            axis.visible = false;
+            selection.visible = false;
         }
 
         // 디버그 로그 띄우기
@@ -125,12 +196,21 @@ export class Player extends Entity {
         }
 
         // 포인터 잠금 toggle
-        if (RinInput.getKeyDown("Space")) {
+        if (RinInput.getKeyDown("KeyP")) {
             RinInput.setPointerLock(!RinInput.pointerLock);
         }
+
+        // fly mode toggle
+        if (RinInput.getKeyDown("KeyO")) {
+            this.fly = !this.fly;
+        }
+
+        line.position.copy(
+            this.instance.position.clone().add(new THREE.Vector3(0, -0.5, 0))
+        );
     }
 
-    playerMovement(deltaTime) {
+    movementInput(deltaTime) {
         const inputDirection = new THREE.Vector3(0, 0, 0);
         let runSpeed = 1;
 
@@ -153,29 +233,129 @@ export class Player extends Entity {
         }
 
         // y축 이동
-        if (RinInput.getKey("KeyQ")) {
-            inputDirection.y -= 1;
-        }
+        if (this.fly) {
+            if (RinInput.getKey("KeyQ")) {
+                inputDirection.y -= 1;
+            }
 
-        if (RinInput.getKey("KeyE")) {
-            inputDirection.y += 1;
+            if (RinInput.getKey("KeyE")) {
+                inputDirection.y += 1;
+            }
         }
 
         // 달리기
-        if (RinInput.getKey("ShiftLeft")) {
+        if (RinInput.getKey("ControlLeft")) {
             runSpeed = this.runSpeed;
+        }
+
+        // 점프
+        if (RinInput.getKeyDown("Space") && this.jumpable) {
+            this.velocity.y += this.jumpForce;
+            this.jumpable = false;
         }
 
         // 이동 벡터를 플레이어가 보는 방향으로 회전
         const direction = rotateVector3(inputDirection, this.horizontalAngle);
 
         // 이동 벡터를 적절한 속도로 지정
-        const vec = direction
-            .normalize()
-            .multiplyScalar(deltaTime * this.moveSpeed * runSpeed);
+        direction.normalize();
+        direction.multiplyScalar(deltaTime * this.moveSpeed * runSpeed);
 
-        // 플레이어 이동
-        this.instance.position.add(vec);
+        return direction;
+    }
+
+    playerMovement(deltaTime) {
+        // 플레이어 입력 벡터
+        const inputVector = this.movementInput(deltaTime);
+
+        // velocity에 이동 벡터 더하기
+        this.velocity.add(inputVector);
+
+        let maxSpeed = RinInput.getKey("ControlLeft")
+            ? this.maxRunSpeed
+            : this.maxSpeed;
+
+        // 날아다니면 속도 배수 적용
+        if (this.fly) {
+            maxSpeed *= this.flySpeedModifier;
+        }
+
+        // 걸어다니는 경우, y 속도를 별도로 관리
+        let _yVelocity = this.velocity.y;
+
+        // 걸어다니는 경우 y 속도를 별도로 관리
+        if (this.fly === false) {
+            // 걸어다니면 y에 중력 가속도 적용
+            _yVelocity -= this.gravity * deltaTime;
+
+            // velocity 크기 제한시 y 속도를 포함하여 계산하지 않도록 y를 0으로
+            this.velocity.y = 0;
+
+            // y 속도 제한
+            if (Math.abs(_yVelocity) > this.maxFallSpeed) {
+                _yVelocity = Math.sign(_yVelocity) * this.maxFallSpeed;
+            }
+        }
+
+        // 가속도 감속
+        this.velocity.multiplyScalar(Math.pow(this.damping, deltaTime));
+
+        // velocity 크기 제한
+        if (this.velocity.length() > maxSpeed) {
+            this.velocity.normalize().multiplyScalar(maxSpeed);
+        }
+
+        // 가속도가 0.1보다 작으면 0으로 지정
+        if (this.velocity.length() < 0.1) {
+            this.velocity.set(0, 0, 0);
+        }
+
+        // 걸어다니는 경우, 별도로 관리하던 y 속도를 velocity에 적용
+        if (this.fly === false) {
+            this.velocity.y = _yVelocity;
+        }
+
+        // 낙하 중이면 점프 불가
+        if (this.velocity.y < -50) {
+            this.jumpable = false;
+        }
+
+        // 가속도를 플레이어 position에 적용
+        const v = this.velocity.clone();
+        const vector = this.velocity
+            .clone()
+            .multiplyScalar((1 / this.baseSpeed) * deltaTime);
+
+        Log.watch(
+            `vel: (${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})\nspeed: ${v.length().toFixed(6)}`
+        );
+        this.instance.position.add(vector);
+
+        // 충돌 체크 및 처리
+        const collisions = checkCollision(
+            this.instance.position,
+            this.scene.world
+        );
+
+        for (const collision of collisions) {
+            const normal = collision.normal;
+            const distance = collision.distance;
+            const inverse = normal.clone().multiplyScalar(distance);
+
+            // 바닥 혹은 천장에 닿은 경우에 따라서, 점프 가능 여부와 y velocity를 조정
+            if (normal.y > 0) {
+                if (this.velocity.y < 0) {
+                    this.velocity.y = 0;
+                }
+                this.jumpable = true;
+            } else if (normal.y < 0) {
+                if (this.velocity.y > 0) {
+                    this.velocity.y = 0;
+                }
+            }
+
+            this.instance.position.add(inverse);
+        }
     }
 
     cameraMovement(deltaTime) {
@@ -200,9 +380,8 @@ export class Player extends Entity {
     }
 
     /**
-     * 현재 바라보고 있는 블록의 좌표를 반환합니다.
-     * 블록을 파괴할 때 유용합니다.
-     * @returns {THREE.Vector3}
+     * 현재 바라보고 있는 블록의 정보를 반환합니다.
+     * @returns {object | null}
      */
     getPointingBlock() {
         if (this.scene.world.mesh === null) {
@@ -223,7 +402,7 @@ export class Player extends Entity {
         const position = this.instance.position;
         const direction = this.instance.getWorldDirection(new THREE.Vector3());
 
-        const intersects = raycast(position, direction);
+        const intersects = worldRaycast(position, direction);
 
         for (const intersect of intersects) {
             const x = intersect.coordinate.x;
@@ -241,12 +420,7 @@ export class Player extends Entity {
                 return { point, distance, coordinate, normal };
             }
         }
-    }
 
-    /**
-     * 현재 바라보고 있는 빈 공간의 좌표를 반환합니다.
-     * 블록을 설치할 때 유용합니다.
-     * @returns {THREE.Vector3}
-     */
-    getPointingSpace() {}
+        return null;
+    }
 }

@@ -7,4 +7,4 @@ export const CAMERA_FAR = 1000;
 export const CAMERA_FOV = 90;
 
 export const TILE_MAP_SIZE = 16;
-export const PLAYER_SIZE = [0.8, 1.8, 0.8];
+export const PLAYER_SIZE = [0.6, 1.8, 0.6];

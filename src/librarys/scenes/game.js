@@ -9,6 +9,8 @@ import { Player } from "../entities/player.js";
 import { World } from "../worlds/world.js";
 import { Sky } from "../entities/sky.js";
 
+let c = 3;
+
 export class GameScene extends RinScene {
     /**
      * @type {Player}
@@ -25,6 +27,8 @@ export class GameScene extends RinScene {
      */
     world = null;
 
+    count = 0;
+
     constructor() {
         super();
     }
@@ -38,7 +42,7 @@ export class GameScene extends RinScene {
 
         // 새로운 World 생성
         this.world = new World(this);
-        this.world.generate(32, MAP_HEIGHT);
+        this.world.generate(16 * 10, MAP_HEIGHT);
 
         // Player 생성
         this.player = new Player(this);
@@ -56,5 +60,17 @@ export class GameScene extends RinScene {
 
     onUpdate(deltaTime) {
         super.onUpdate(deltaTime);
+
+        // if (this.player.active === false) {
+        //     this.player.active = true;
+        // }
+
+        if (this.count <= c) {
+            this.count++;
+
+            if (this.count === c) {
+                this.player.active = true;
+            }
+        }
     }
 }

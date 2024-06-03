@@ -20,8 +20,7 @@ export function getMinMax(size) {
         return [null, null];
     }
 
-    // half가 0인 경우 -half는 -0이 됨
-    // +0을 붙이면 -0이 +0이 됨
+    // -half에 0을 더해서 -0을 +0으로 변환
     const half = Math.floor(--size / 2);
     return [-half + 0, half + (size % 2)];
 }
@@ -104,7 +103,7 @@ export function getDecimal(value) {
 }
 
 /**
- * number를 0.5로 올림 혹은 내림합니다.
+ * number를 n + 0.5로 올림 혹은 내림합니다.
  * @param {number} value
  * @param {number} sign 올림 혹은 내림 방향
  * @returns {number}
@@ -127,3 +126,12 @@ export function getHalfDecimal(value, sign) {
 
 //     return new THREE.Vector3(x, y, z);
 // }
+
+/**
+ * Math.round와 동일한 기능을 수행합니다. -0을 반환하지 않습니다.
+ * @param {number} value 반올림할 값
+ * @returns {number} 반올림된 값
+ */
+export function round(value) {
+    return Math.round(value) + 0;
+}
