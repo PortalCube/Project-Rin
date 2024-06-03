@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { createEnum, randomRange } from "../util.js";
 import { TILE_MAP_SIZE } from "../setting.js";
 
+import BlockData from "../items/blocks.json";
+
 //prettier-ignore
 export const Direction = createEnum({
     Right: 0, // X+
@@ -75,12 +77,7 @@ export class Block {
     }
 
     set id(value) {
-        if (value === 2) {
-            this._id = randomRange(1, 8);
-        } else {
-            this._id = value;
-        }
-
+        this._id = value;
         this.active = this._id !== 0;
     }
 
@@ -148,6 +145,28 @@ export class Block {
         return blockInfos.infos.length;
     }
 
+    _getNearBlockDirections() {
+        const directions = [];
+
+        for (let direction = 0; direction < 6; direction++) {
+            const block = this.getNearBlock(direction);
+
+            // 블록의 face가 world border를 가리키는 경우 - 렌더링하지 않음
+            // if (block === null) {
+            //     continue;
+            // }
+
+            // 블록의 face가 다른 active 블록과 맞닿은 경우 - 렌더링하지 않음
+            if (block?.active === true) {
+                continue;
+            }
+
+            directions.push(direction);
+        }
+
+        return directions;
+    }
+
     _getRenderInfos() {
         // 비활성화된 블록은 렌더링하지 않음
         if (this.active === false) {
@@ -156,6 +175,21 @@ export class Block {
 
         const blockRenderInfos = [];
         let hash = 0;
+
+        const blockData = BlockData.filter((data) => data.id === this.id);
+        let textures = [];
+
+        if (blockData.length > 0) {
+            const _texture = blockData[0].texture;
+
+            if (_texture instanceof Array) {
+                textures = _texture;
+            } else {
+                textures = Array(6).fill(_texture);
+            }
+        } else {
+            textures = Array(6).fill(this.id);
+        }
 
         for (let direction = 0; direction < 6; direction++) {
             const block = this.getNearBlock(direction);
@@ -216,7 +250,7 @@ export class Block {
                 // direction: direction,
 
                 // 렌더링에 필수적인 정보
-                uvOffset: getUVOffset(this.id),
+                uvOffset: getUVOffset(textures[direction]),
                 matrix: matrix,
             });
         }
