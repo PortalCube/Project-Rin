@@ -6,7 +6,12 @@ import {
     MAP_HEIGHT,
     TILE_MAP_SIZE,
 } from "../setting.js";
-import { getChunkCoordinate, getChunkIndex, getMinMax } from "../util.js";
+import {
+    getChunkCoordinate,
+    getChunkIndex,
+    getMinMax,
+    randomRange,
+} from "../util.js";
 import { Chunk } from "./chunk.js";
 import { RinEngine } from "../engine.js";
 
@@ -89,7 +94,7 @@ export class World {
         for (let x = this.minWorldValue; x <= this.maxWorldValue; x++) {
             for (let z = this.minWorldValue; z <= this.maxWorldValue; z++) {
                 const level = GROUND_LEVEL;
-                // const level = randomRange(GROUND_LEVEL - 5, GROUND_LEVEL);
+                // const level = randomRange(GROUND_LEVEL - 15, GROUND_LEVEL);
                 for (let y = 0; y < this.depth; y++) {
                     // GROUND_LEVEL 미만의 y좌표는 돌로 채우기
                     // GROUND_LEVEL의 y좌표는 잔디로 채우기
@@ -216,23 +221,23 @@ export class World {
             this.renderCount
         );
 
-        const uvOffsets = [];
+        const uvOffsets = new Float32Array(this.renderCount * 2);
         let index = 0;
 
         for (const renderBlockInfo of this.renderInfos.values()) {
             for (const info of renderBlockInfo.infos) {
                 // index번째 instance에 instanceMatrix를 지정
-                mesh.setMatrixAt(index++, info.matrix);
+                mesh.setMatrixAt(index, info.matrix);
 
                 // uvOffset 정보를 배열에 넣기
-                uvOffsets.push(...info.uvOffset);
+                uvOffsets.set(info.uvOffset, index++ * 2);
             }
         }
 
         // 각 instance에 대한 uvOffset을 InstancedBufferAttribute로 추가
         geometry.setAttribute(
             "uvOffset",
-            new THREE.InstancedBufferAttribute(new Float32Array(uvOffsets), 2)
+            new THREE.InstancedBufferAttribute(uvOffsets, 2)
         );
 
         if (this.mesh) {
@@ -276,6 +281,7 @@ export class World {
     /**
      * World의 block의 렌더링을 업데이트합니다. (내부 함수)
      * @param {Block} block
+     * @param {number} depth
      */
     _updateRender(block, depth = 0) {
         const key = `${block.coordinate.x}:${block.coordinate.y}:${block.coordinate.z}`;
@@ -292,8 +298,7 @@ export class World {
 
         // hash가 같으면 업데이트하지 않음
         if (oldHash === newHash) {
-            depth++;
-            if (depth > 2) {
+            if (depth++ > 1) {
                 return false;
             }
         }
@@ -383,12 +388,7 @@ export class World {
 
         if (block) {
             block.id = id;
-
-            const time = performance.now();
-
             this.updateRender(x, y, z);
-
-            Log.info(`updateRender: ${performance.now() - time}ms`);
         }
     }
 }

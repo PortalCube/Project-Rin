@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { Entity } from "./entity.js";
-import { RinScene } from "../scenes/scene.js";
 
 import skyVertexShader from "../../assets/shaders/sky.vert?raw";
 import skyFragmentShader from "../../assets/shaders/sky.frag?raw";
