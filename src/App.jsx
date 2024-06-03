@@ -23,6 +23,8 @@ const Debug = styled.div`
     font-family: "Courier New", Courier, monospace;
     font-weight: 400;
     font-style: normal;
+
+    white-space: pre-wrap;
 `;
 
 const Canvas = styled.canvas`

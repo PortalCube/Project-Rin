@@ -114,19 +114,6 @@ export function getHalfDecimal(value, sign) {
         : Math.ceil(value - 0.5) + 0.5;
 }
 
-// /**
-//  * point를 block coordinate로 clamp합니다.
-//  * @param {THREE.Vector3} point
-//  * @param {THREE.Vector3} coordinate
-//  */
-// export function clampToBlock(point, coordinate) {
-//     const x = clamp(point.x, coordinate.x - 0.5, coordinate.x + 0.5);
-//     const y = clamp(point.y, coordinate.y - 0.5, coordinate.y + 0.5);
-//     const z = clamp(point.z, coordinate.z - 0.5, coordinate.z + 0.5);
-
-//     return new THREE.Vector3(x, y, z);
-// }
-
 /**
  * Math.round와 동일한 기능을 수행합니다. -0을 반환하지 않습니다.
  * @param {number} value 반올림할 값
@@ -134,4 +121,8 @@ export function getHalfDecimal(value, sign) {
  */
 export function round(value) {
     return Math.round(value) + 0;
+}
+
+export function getPercentValue(value, min, max) {
+    return (value - min) / (max - min);
 }

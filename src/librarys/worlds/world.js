@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { Log } from "../log.js";
 import {
     CHUNK_SIZE,
-    GROUND_LEVEL,
+    GROUND_MAX_LEVEL,
+    GROUND_MIN_LEVEL,
     MAP_HEIGHT,
     TILE_MAP_SIZE,
 } from "../setting.js";
@@ -10,13 +11,14 @@ import {
     getChunkCoordinate,
     getChunkIndex,
     getMinMax,
-    randomRange,
+    getPercentValue,
 } from "../util.js";
 import { Chunk } from "./chunk.js";
 import { RinEngine } from "../engine.js";
 
 import blockVertexShader from "../../assets/shaders/block.vert?raw";
 import blockFragmentShader from "../../assets/shaders/block.frag?raw";
+import { getFractalBrownianMotion } from "../perlin_noise.js";
 
 export class World {
     /**
@@ -88,20 +90,41 @@ export class World {
             this.chunks.push(list);
         }
 
-        // 2. 맵 생성 알고리즘을 적용합니다. 여기서는 매우 간단한 알고리즘을 적용하였습니다.
+        // 2. 맵 생성 알고리즘을 적용합니다. 펄린 노이즈와 프랙탈 브라우니안 모션을 사용하여 현실과 같은 지형을 만듧니다.
         let blockId = 0;
+
+        const minValue = -Math.sqrt(2);
+        const maxValue = Math.sqrt(2);
+
+        console.log(
+            maxValue * (GROUND_MAX_LEVEL - GROUND_MIN_LEVEL) + GROUND_MIN_LEVEL
+        );
+
+        const GROUND_RANGE = GROUND_MAX_LEVEL - GROUND_MIN_LEVEL;
 
         for (let x = this.minWorldValue; x <= this.maxWorldValue; x++) {
             for (let z = this.minWorldValue; z <= this.maxWorldValue; z++) {
-                const level = GROUND_LEVEL;
-                // const level = randomRange(GROUND_LEVEL - 15, GROUND_LEVEL);
+                // const level = GROUND_LEVEL;
+                const _x = x - this.minWorldValue;
+                const _z = z - this.minWorldValue;
+
+                const value = getFractalBrownianMotion(_x, _z, 12);
+                const level = Math.floor(
+                    getPercentValue(value, minValue, maxValue) * GROUND_RANGE +
+                        GROUND_MIN_LEVEL
+                );
+
                 for (let y = 0; y < this.depth; y++) {
                     // GROUND_LEVEL 미만의 y좌표는 돌로 채우기
                     // GROUND_LEVEL의 y좌표는 잔디로 채우기
                     // GROUND_LEVEL 초과의 y좌표는 공기로 채우기
 
-                    if (y < level) {
+                    if (y < 2) {
+                        blockId = 17;
+                    } else if (y < level - 3) {
                         blockId = 1;
+                    } else if (y < level) {
+                        blockId = 3;
                     } else if (y === level) {
                         blockId = 2;
                     } else {

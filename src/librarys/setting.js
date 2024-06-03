@@ -1,6 +1,8 @@
 export const CHUNK_SIZE = 16;
+export const GROUND_MAX_LEVEL = 48;
+export const GROUND_MIN_LEVEL = 16;
 export const GROUND_LEVEL = 16;
-export const MAP_HEIGHT = 32;
+export const MAP_HEIGHT = 64;
 
 export const CAMERA_NEAR = 0.1;
 export const CAMERA_FAR = 1000;
