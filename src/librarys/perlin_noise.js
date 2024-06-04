@@ -13,6 +13,23 @@ function getConstantVector(v) {
     return vectors[i];
 }
 
+function getConstantVector3D(v) {
+    const i = v % 8;
+
+    const vectors = [
+        [1.0, 1.0, 0.0],
+        [-1.0, 1.0, 0.0],
+        [-1.0, -1.0, 0.0],
+        [1.0, -1.0, 0.0],
+        [1.0, 0.0, 1.0],
+        [-1.0, 0.0, 1.0],
+        [-1.0, 0.0, -1.0],
+        [1.0, 0.0, -1.0],
+    ];
+
+    return vectors[i];
+}
+
 function fade(t) {
     return ((6 * t - 15) * t + 10) * t * t * t;
 }
@@ -56,14 +73,14 @@ export function getPerlinNoise(x, y) {
     const yf = getDecimal(y);
 
     const topRight = [xf - 1.0, yf - 1.0];
-    const topLeft = [xf, yf - 1.0];
-    const bottomRight = [xf - 1.0, yf];
-    const bottomLeft = [xf, yf];
+    const topLeft = [xf - 0.0, yf - 1.0];
+    const bottomRight = [xf - 1.0, yf - 0.0];
+    const bottomLeft = [xf - 0.0, yf - 0.0];
 
     const topRightValue = P[P[_x + 1] + _y + 1];
-    const topLeftValue = P[P[_x] + _y + 1];
-    const bottomRightValue = P[P[_x + 1] + _y];
-    const bottomLeftValue = P[P[_x] + _y];
+    const topLeftValue = P[P[_x + 0] + _y + 1];
+    const bottomRightValue = P[P[_x + 1] + _y + 0];
+    const bottomLeftValue = P[P[_x + 0] + _y + 0];
 
     const topRightVector = getConstantVector(topRightValue);
     const topLeftVector = getConstantVector(topLeftValue);
@@ -84,14 +101,18 @@ export function getPerlinNoise(x, y) {
     return lerp(u, x1, x2);
 }
 
-export function getFractalBrownianMotion(x, y, octaves) {
-    let result = 0;
-    let amplitude = 1;
-    let frequency = 0.006 * 2;
+export function getFractalBrownianMotion(
+    x,
+    y,
+    octaves = 8,
+    amplitude = 1,
+    frequency = 0.01
+) {
+    let sum = 0;
 
     for (let octave = 0; octave < octaves; octave++) {
         // perlinNoise 값에 진폭을 곱해서 더하기
-        result += amplitude * getPerlinNoise(x * frequency, y * frequency);
+        sum += amplitude * getPerlinNoise(x * frequency, y * frequency);
 
         // 진폭을 절반으로
         amplitude /= 2;
@@ -100,5 +121,33 @@ export function getFractalBrownianMotion(x, y, octaves) {
         frequency *= 2;
     }
 
-    return result;
+    return sum;
+}
+
+export function create2DNoiseFunction(options) {
+    const {
+        min,
+        max,
+        shiftX = 0,
+        shiftY = 0,
+        octaves = 8,
+        amplitude = 1,
+        frequency = 0.01,
+    } = options;
+
+    const minNoise = -Math.sqrt(2);
+    const maxNoise = Math.sqrt(2);
+
+    return (x, y) => {
+        const value = getFractalBrownianMotion(
+            x + shiftX,
+            y + shiftY,
+            octaves,
+            amplitude,
+            frequency
+        );
+        const normalized = (value - minNoise) / (maxNoise - minNoise);
+
+        return min + (max - min) * normalized;
+    };
 }

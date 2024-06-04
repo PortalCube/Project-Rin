@@ -37,10 +37,10 @@ const selection = new THREE.Mesh(
 const axis = new THREE.AxesHelper(2);
 
 // create wireframe
-const geometry = new THREE.BoxGeometry(...PLAYER_SIZE);
-// const geometry = new THREE.CylinderGeometry(...PLAYER_SIZE);
-const wireframe = new THREE.WireframeGeometry(geometry);
-const line = new THREE.LineSegments(wireframe);
+// const geometry = new THREE.BoxGeometry(...PLAYER_SIZE);
+// // const geometry = new THREE.CylinderGeometry(...PLAYER_SIZE);
+// const wireframe = new THREE.WireframeGeometry(geometry);
+// const line = new THREE.LineSegments(wireframe);
 
 export class Player extends Entity {
     /**
@@ -64,11 +64,13 @@ export class Player extends Entity {
     maxSpeed = 400;
     maxRunSpeed = 1000;
     maxFallSpeed = 3000;
-    jumpForce = 900;
+    jumpForce = 830;
     runSpeed = 2.5;
-    lookSpeed = (Math.PI * 2) / 12;
+    lookSpeed = (Math.PI * 2) / 1200;
 
-    fly = false;
+    blockDelay = 0;
+
+    fly = true;
     jumpable = false;
 
     /**
@@ -110,13 +112,13 @@ export class Player extends Entity {
 
         this.instance = scene.camera;
         this.instance.position.z = 3;
-        this.instance.position.y = GROUND_MAX_LEVEL + 1;
+        this.instance.position.y = GROUND_MAX_LEVEL + 10;
 
         this.velocity = new THREE.Vector3(0, 0, 0);
 
         this.scene.scene.add(axis);
         this.scene.scene.add(selection);
-        this.scene.scene.add(line);
+        // this.scene.scene.add(line);
     }
 
     onFrameUpdate(deltaTime) {
@@ -134,6 +136,10 @@ export class Player extends Entity {
 
         const pointingBlock = this.getPointingBlock();
 
+        if (this.blockDelay > 0) {
+            this.blockDelay -= deltaTime;
+        }
+
         if (pointingBlock && pointingBlock.distance < this.range) {
             axis.visible = true;
             selection.visible = true;
@@ -141,15 +147,23 @@ export class Player extends Entity {
             axis.position.copy(pointingBlock.point);
             selection.position.copy(pointingBlock.coordinate);
 
-            if (RinInput.getPointerDown(0)) {
+            if (
+                RinInput.getPointerDown(0) ||
+                (this.blockDelay <= 0 && RinInput.getPointer(0))
+            ) {
                 const x = pointingBlock.coordinate.x;
                 const y = pointingBlock.coordinate.y;
                 const z = pointingBlock.coordinate.z;
 
                 this.scene.world.setBlock(x, y, z, 0);
+
+                this.blockDelay = 0.25;
             }
 
-            if (RinInput.getPointerDown(2)) {
+            if (
+                RinInput.getPointerDown(2) ||
+                (this.blockDelay <= 0 && RinInput.getPointer(2))
+            ) {
                 const normal = pointingBlock.normal;
                 const coordinate = pointingBlock.coordinate.clone().add(normal);
 
@@ -165,7 +179,9 @@ export class Player extends Entity {
                 const y = coordinate.y;
                 const z = coordinate.z;
 
-                this.scene.world.setBlock(x, y, z, 6);
+                this.scene.world.setBlock(x, y, z, 20);
+
+                this.blockDelay = 0.25;
             }
         } else {
             axis.visible = false;
@@ -190,9 +206,9 @@ export class Player extends Entity {
             this.jumpable = false;
         }
 
-        line.position.copy(
-            this.instance.position.clone().add(new THREE.Vector3(0, -0.5, 0))
-        );
+        // line.position.copy(
+        //     this.instance.position.clone().add(new THREE.Vector3(0, -0.5, 0))
+        // );
     }
 
     onFixedUpdate(fixedDeltaTime) {
@@ -234,7 +250,7 @@ export class Player extends Entity {
         }
 
         // 달리기
-        if (RinInput.getKey("ControlLeft")) {
+        if (RinInput.getKey("ShiftLeft")) {
             runSpeed = this.runSpeed;
         }
 
@@ -261,7 +277,7 @@ export class Player extends Entity {
         // velocity에 이동 벡터 더하기
         this.velocity.add(inputVector);
 
-        let maxSpeed = RinInput.getKey("ControlLeft")
+        let maxSpeed = RinInput.getKey("ShiftLeft")
             ? this.maxRunSpeed
             : this.maxSpeed;
 
@@ -318,52 +334,50 @@ export class Player extends Entity {
 
         this.instance.position.add(vector);
 
-        // 충돌 체크 및 처리
-        const collisions = checkCollision(
-            this.instance.position,
-            this.scene.world
-        );
+        // 걸어다니면 충돌 체크 및 처리
+        if (this.fly === false) {
+            const collisions = checkCollision(
+                this.instance.position,
+                this.scene.world
+            );
 
-        for (const collision of collisions) {
-            const normal = collision.normal;
-            const distance = collision.distance;
-            const inverse = normal.clone().multiplyScalar(distance);
+            for (const collision of collisions) {
+                const normal = collision.normal;
+                const distance = collision.distance;
+                const inverse = normal.clone().multiplyScalar(distance);
 
-            // 바닥 혹은 천장에 닿은 경우에 따라서, 점프 가능 여부와 y velocity를 조정
-            if (normal.y > 0) {
-                if (this.velocity.y < 0) {
-                    this.velocity.y = 0;
+                // 바닥 혹은 천장에 닿은 경우에 따라서, 점프 가능 여부와 y velocity를 조정
+                if (normal.y > 0) {
+                    if (this.velocity.y < 0) {
+                        this.velocity.y = 0;
+                    }
+                    this.jumpable = true;
+                } else if (normal.y < 0) {
+                    if (this.velocity.y > 0) {
+                        this.velocity.y = 0;
+                    }
                 }
-                this.jumpable = true;
-            } else if (normal.y < 0) {
-                if (this.velocity.y > 0) {
-                    this.velocity.y = 0;
-                }
+
+                this.instance.position.add(inverse);
             }
-
-            this.instance.position.add(inverse);
         }
 
         const p = this.instance.position
             .clone()
             .add(new THREE.Vector3(0, -PLAYER_SIZE[1] * (3 / 4), 0));
         const v = this.velocity.clone();
-        const messages = [
-            `pos: (${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)})`,
-            `vel: (${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`,
-            `speed: ${v.length().toFixed(6)}`,
-            `jumpable: ${this.jumpable}`,
-        ];
-
-        Log.watch(messages.join("\n"));
+        Log.watchVector("pos", p);
+        Log.watchVector("vel", v);
+        Log.watch("speed", v.length().toFixed(2));
+        Log.watch("jumpable", this.jumpable);
     }
 
     cameraMovement(deltaTime) {
         const dx = RinInput.pointerPosition.dx;
         const dy = RinInput.pointerPosition.dy;
 
-        this.horizontalAngle -= dx * this.lookSpeed * deltaTime;
-        this.verticalAngle -= dy * this.lookSpeed * deltaTime;
+        this.horizontalAngle -= dx * this.lookSpeed;
+        this.verticalAngle -= dy * this.lookSpeed;
 
         this.verticalAngle = clamp(
             this.verticalAngle,

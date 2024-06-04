@@ -6,6 +6,7 @@ import { RinInput } from "./input.js";
 import Stats from "three/addons/libs/stats.module.js";
 
 import terrain from "../assets/textures/terrain.png";
+import { Log } from "./log.js";
 
 // 엔진 메인 object
 export const RinEngine = {
@@ -151,8 +152,9 @@ function frameUpdate(currentTime) {
         if (RinEngine._frameElapsedTime >= RinEngine._frameInterval) {
             sceneUpdate(currentTime - RinEngine._latestFrameUpdateTime);
             RinEngine._frameElapsedTime -= RinEngine._frameInterval;
+            RinEngine._latestFrameUpdateTime = currentTime;
         }
-
+    } else {
         RinEngine._latestFrameUpdateTime = currentTime;
     }
 
@@ -163,16 +165,15 @@ function frameUpdate(currentTime) {
         if (RinEngine._tickElapsedTime >= RinEngine._tickInterval) {
             gameUpdate(currentTime - RinEngine._latestTickUpdateTime);
             RinEngine._tickElapsedTime -= RinEngine._tickInterval;
+            RinEngine._latestTickUpdateTime = currentTime;
         }
-
+    } else {
         RinEngine._latestTickUpdateTime = currentTime;
     }
 
     // ----- Fixed Update -----
     if (RinEngine.enableFixedUpdate) {
         RinEngine._fixedElapsedTime += deltaTime;
-
-        let count = 0;
 
         while (RinEngine._fixedElapsedTime >= RinEngine._fixedInterval) {
             fixedUpdate(RinEngine._fixedInterval);
@@ -202,6 +203,12 @@ function sceneUpdate(deltaTime) {
 
         renderer.render(scene, camera);
     }
+
+    Log.watch("FPS", Math.round(1 / deltaTime));
+    Log.watch("drawcall", RinEngine.renderer.info.render.calls);
+    Log.watch("vertices", RinEngine.renderer.info.render.triangles * 3);
+
+    Log._flushWatch();
 
     RinInput._postUpdate();
 }

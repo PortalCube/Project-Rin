@@ -7,6 +7,8 @@ function getTime() {
 export const Log = {
     element: null,
 
+    watchTable: [],
+
     info: (...message) => {
         console.log(`[${getTime()}][INFO]`, ...message);
     },
@@ -19,11 +21,26 @@ export const Log = {
     log: (...message) => {
         console.Log(`[${getTime()}][Log]`, ...message);
     },
-    watch: (message) => {
-        if (Log.element === null) {
-            return;
-        }
+    watch: (key, value) => {
+        const item = Log.watchTable.find((item) => item.key === key);
 
-        Log.element.textContent = message;
+        if (item) {
+            item.value = value;
+        } else {
+            Log.watchTable.push({ key, value });
+        }
+    },
+
+    watchVector: (key, vector) => {
+        const value = `(${vector.x.toFixed(3)}, ${vector.y.toFixed(3)}, ${vector.z.toFixed(3)})`;
+        Log.watch(key, value);
+    },
+
+    _flushWatch: () => {
+        if (Log.watchTable.length === 0) return;
+
+        Log.element.textContent = Log.watchTable
+            .map(({ key, value }) => `${key}: ${value}`)
+            .join("\n");
     },
 };

@@ -49,6 +49,7 @@ export class Block {
 
     _id = 0;
     _active = false;
+    _info = null;
 
     /**
      * @type {THREE.Vector3}
@@ -79,6 +80,8 @@ export class Block {
     set id(value) {
         this._id = value;
         this.active = this._id !== 0;
+        this._info =
+            BlockData.filter((data) => data.id === this.id)?.[0] ?? null;
     }
 
     get active() {
@@ -91,6 +94,10 @@ export class Block {
         }
 
         this._active = value;
+    }
+
+    get info() {
+        return this._info;
     }
 
     static get Direction() {
@@ -176,11 +183,12 @@ export class Block {
         const blockRenderInfos = [];
         let hash = 0;
 
-        const blockData = BlockData.filter((data) => data.id === this.id);
         let textures = [];
+        let transparent = false;
 
-        if (blockData.length > 0) {
-            const _texture = blockData[0].texture;
+        if (this.info) {
+            const _texture = this.info.texture;
+            transparent = this.info.transparent === true;
 
             if (_texture instanceof Array) {
                 textures = _texture;
@@ -199,9 +207,18 @@ export class Block {
             //     continue;
             // }
 
-            // 블록의 face가 다른 active 블록과 맞닿은 경우 - 렌더링하지 않음
+            // 블록의 face가 다른 active 블록과 맞닿은 경우
             if (block?.active === true) {
-                continue;
+                // 블록이 transparent하지 않은 경우
+                // 혹은 transparent하더라도 동일 블록인 경우
+                //  -> 렌더링하지 않음
+                if (block.info?.transparent !== true) {
+                    continue;
+                }
+
+                if (this.info?.transparent === true && block.id === this.id) {
+                    continue;
+                }
             }
 
             // 블록 instance의 instanceMatrix를 계산
@@ -252,6 +269,7 @@ export class Block {
                 // 렌더링에 필수적인 정보
                 uvOffset: getUVOffset(textures[direction]),
                 matrix: matrix,
+                transparent: transparent,
             });
         }
 

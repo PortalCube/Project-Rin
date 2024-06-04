@@ -14,8 +14,8 @@ const Container = styled.div`
 
 const Debug = styled.div`
     position: absolute;
-    right: 12px;
-    top: 12px;
+    left: 12px;
+    bottom: 12px;
     padding: 8px;
     background-color: black;
     color: white;

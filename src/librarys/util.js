@@ -122,7 +122,3 @@ export function getHalfDecimal(value, sign) {
 export function round(value) {
     return Math.round(value) + 0;
 }
-
-export function getPercentValue(value, min, max) {
-    return (value - min) / (max - min);
-}

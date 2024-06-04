@@ -30,15 +30,35 @@
         "texture": [5, 5, 6, 6, 5, 5]
     },
     {
-        "id": 6,
-        "name": "brick",
-        "display_name": "벽돌",
-        "texture": 7
-    },
-    {
-        "id": 17,
+        "id": 7,
         "name": "bedrock",
         "display_name": "베드락",
         "texture": 17
+    },
+    {
+        "id": 9,
+        "name": "water",
+        "display_name": "물",
+        "texture": 14,
+        "transparent": true
+    },
+    {
+        "id": 12,
+        "name": "sand",
+        "display_name": "모래",
+        "texture": 18
+    },
+    {
+        "id": 20,
+        "name": "glass",
+        "display_name": "유리",
+        "texture": 49,
+        "transparent": true
+    },
+    {
+        "id": 45,
+        "name": "brick",
+        "display_name": "벽돌",
+        "texture": 7
     }
 ]

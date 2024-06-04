@@ -7,18 +7,13 @@ import {
     MAP_HEIGHT,
     TILE_MAP_SIZE,
 } from "../setting.js";
-import {
-    getChunkCoordinate,
-    getChunkIndex,
-    getMinMax,
-    getPercentValue,
-} from "../util.js";
+import { getChunkCoordinate, getChunkIndex, getMinMax } from "../util.js";
 import { Chunk } from "./chunk.js";
 import { RinEngine } from "../engine.js";
 
 import blockVertexShader from "../../assets/shaders/block.vert?raw";
 import blockFragmentShader from "../../assets/shaders/block.frag?raw";
-import { getFractalBrownianMotion } from "../perlin_noise.js";
+import { create2DNoiseFunction } from "../perlin_noise.js";
 
 export class World {
     /**
@@ -35,6 +30,11 @@ export class World {
      * @type {THREE.InstancedMesh}
      */
     mesh = null;
+
+    /**
+     * @type {THREE.InstancedMesh}
+     */
+    transparentMesh = null;
 
     /**
      * @type {Map} 렌더링 정보 배열
@@ -90,46 +90,53 @@ export class World {
             this.chunks.push(list);
         }
 
-        // 2. 맵 생성 알고리즘을 적용합니다. 펄린 노이즈와 프랙탈 브라우니안 모션을 사용하여 현실과 같은 지형을 만듧니다.
+        // 2. 맵 생성 알고리즘을 적용합니다. 펄린 노이즈와 프랙탈 브라운 운동을 사용하여 현실과 같은 지형을 만듧니다.
         let blockId = 0;
 
-        const minValue = -Math.sqrt(2);
-        const maxValue = Math.sqrt(2);
+        // 펄린 노이즈 함수 생성
+        const getLevelNoise = create2DNoiseFunction({
+            min: GROUND_MIN_LEVEL,
+            max: GROUND_MAX_LEVEL,
+            octaves: 12,
+        });
 
-        console.log(
-            maxValue * (GROUND_MAX_LEVEL - GROUND_MIN_LEVEL) + GROUND_MIN_LEVEL
-        );
-
-        const GROUND_RANGE = GROUND_MAX_LEVEL - GROUND_MIN_LEVEL;
+        const getTemperatureNoise = create2DNoiseFunction({
+            min: -3,
+            max: 7,
+            amplitude: 1,
+            frequency: 0.01075,
+            octaves: 8,
+        });
 
         for (let x = this.minWorldValue; x <= this.maxWorldValue; x++) {
             for (let z = this.minWorldValue; z <= this.maxWorldValue; z++) {
-                // const level = GROUND_LEVEL;
+                // 펄린 노이즈를 사용하여 level을 결정
                 const _x = x - this.minWorldValue;
                 const _z = z - this.minWorldValue;
-
-                const value = getFractalBrownianMotion(_x, _z, 12);
-                const level = Math.floor(
-                    getPercentValue(value, minValue, maxValue) * GROUND_RANGE +
-                        GROUND_MIN_LEVEL
-                );
+                const level = Math.floor(getLevelNoise(_x, _z));
+                const temperature = Math.floor(getTemperatureNoise(_x, _z));
 
                 for (let y = 0; y < this.depth; y++) {
-                    // GROUND_LEVEL 미만의 y좌표는 돌로 채우기
-                    // GROUND_LEVEL의 y좌표는 잔디로 채우기
-                    // GROUND_LEVEL 초과의 y좌표는 공기로 채우기
-
                     if (y < 2) {
-                        blockId = 17;
+                        // y축이 2보다 작으면 베드락
+                        blockId = 7;
                     } else if (y < level - 3) {
+                        //level - 3보다 작으면 돌
                         blockId = 1;
                     } else if (y < level) {
-                        blockId = 3;
-                    } else if (y === level) {
-                        blockId = 2;
+                        // level보다 작으면 흙
+                        blockId = temperature > 0 ? 3 : 12;
+                    } else if (y === level && level >= 28) {
+                        // level이면 잔디
+                        blockId = temperature > 0 ? 2 : 12;
+                    } else if (y < 28) {
+                        // level이 28보다 작을때, level부터 16까지 물로 채우기
+                        blockId = 9;
                     } else {
+                        // level보다 크면 공기
                         blockId = 0;
                     }
+
                     const block = this.getBlock(x, y, z);
                     block.id = blockId;
                 }
@@ -208,11 +215,22 @@ export class World {
     buildMesh() {
         const planeGeometry = new THREE.PlaneGeometry();
         const geometry = new THREE.InstancedBufferGeometry();
+        const transparentGeometry = new THREE.InstancedBufferGeometry();
 
         // InstancedBufferGeometry에 PlaneGeometry의 attribute들을 복사
         geometry.setAttribute("position", planeGeometry.attributes.position);
         geometry.setAttribute("normal", planeGeometry.attributes.normal);
         geometry.index = planeGeometry.index;
+
+        transparentGeometry.setAttribute(
+            "position",
+            planeGeometry.attributes.position
+        );
+        transparentGeometry.setAttribute(
+            "normal",
+            planeGeometry.attributes.normal
+        );
+        transparentGeometry.index = planeGeometry.index;
 
         // UV
         const uvs = [
@@ -226,6 +244,10 @@ export class World {
             0,
         ];
         geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+        transparentGeometry.setAttribute(
+            "uv",
+            new THREE.Float32BufferAttribute(uvs, 2)
+        );
 
         // ShaderMaterial을 생성하고 blockShader, textureImage 적용
         const material = new THREE.ShaderMaterial({
@@ -238,17 +260,37 @@ export class World {
             fragmentShader: blockFragmentShader,
         });
 
+        const transparentMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                textureImage: {
+                    value: RinEngine.texture,
+                },
+            },
+            vertexShader: blockVertexShader,
+            fragmentShader: blockFragmentShader,
+            transparent: true,
+        });
+
         const mesh = new THREE.InstancedMesh(
             geometry,
             material,
             this.renderCount
         );
 
+        mesh.renderOrder = -2;
+
         const uvOffsets = new Float32Array(this.renderCount * 2);
         let index = 0;
 
+        let transparentItems = [];
+
         for (const renderBlockInfo of this.renderInfos.values()) {
             for (const info of renderBlockInfo.infos) {
+                if (info.transparent) {
+                    transparentItems.push(info);
+                    continue;
+                }
+
                 // index번째 instance에 instanceMatrix를 지정
                 mesh.setMatrixAt(index, info.matrix);
 
@@ -270,8 +312,45 @@ export class World {
             this.scene.scene.remove(this.mesh);
         }
 
+        if (this.transparentMesh) {
+            this.transparentMesh.geometry.dispose();
+            this.transparentMesh.material.dispose();
+
+            this.scene.scene.remove(this.transparentMesh);
+        }
+
         this.mesh = mesh;
         this.scene.scene.add(mesh);
+
+        // 투명 블록을 위한 InstancedMesh 생성
+        if (transparentItems.length > 0) {
+            const mesh = new THREE.InstancedMesh(
+                transparentGeometry,
+                transparentMaterial,
+                transparentItems.length
+            );
+
+            mesh.renderOrder = -1;
+
+            const uvOffsets = new Float32Array(transparentItems.length * 2);
+            index = 0;
+
+            for (const info of transparentItems) {
+                // index번째 instance에 instanceMatrix를 지정
+                mesh.setMatrixAt(index, info.matrix);
+
+                // uvOffset 정보를 배열에 넣기
+                uvOffsets.set(info.uvOffset, index++ * 2);
+            }
+            // 각 instance에 대한 uvOffset을 InstancedBufferAttribute로 추가
+            transparentGeometry.setAttribute(
+                "uvOffset",
+                new THREE.InstancedBufferAttribute(uvOffsets, 2)
+            );
+
+            this.transparentMesh = mesh;
+            this.scene.scene.add(mesh);
+        }
 
         this.needRenderUpdate = false;
 
