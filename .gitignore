@@ -86,3 +86,7 @@ typings/
 
 # DynamoDB Local files
 .dynamodb/
+
+# 개발 애셋들
+test.html
+.dev/*
