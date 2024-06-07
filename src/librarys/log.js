@@ -18,9 +18,6 @@ export const Log = {
     error: (...message) => {
         console.error(`[${getTime()}][ERROR]`, ...message);
     },
-    log: (...message) => {
-        console.Log(`[${getTime()}][Log]`, ...message);
-    },
     watch: (key, value) => {
         const item = Log.watchTable.find((item) => item.key === key);
 
@@ -32,7 +29,8 @@ export const Log = {
     },
 
     watchVector: (key, vector) => {
-        const value = `(${vector.x.toFixed(3)}, ${vector.y.toFixed(3)}, ${vector.z.toFixed(3)})`;
+        const precision = 2;
+        const value = `(${vector.x.toFixed(precision)}, ${vector.y.toFixed(precision)}, ${vector.z.toFixed(precision)})`;
         Log.watch(key, value);
     },
 

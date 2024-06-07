@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import styled from "styled-components";
-import { createGame, useStats } from "./librarys/main.jsx";
+import { createGame, isCreated, useStats } from "./librarys/main.jsx";
+import QuickBar from "./components/QuickBar.jsx";
+import { Log } from "./librarys/log.js";
 
 const Container = styled.div`
     display: flex;
@@ -16,6 +18,7 @@ const Container = styled.div`
 `;
 
 const Debug = styled.div`
+    min-width: 300px;
     position: absolute;
     left: 12px;
     bottom: 12px;
@@ -23,7 +26,7 @@ const Debug = styled.div`
     background-color: black;
     color: white;
 
-    font-family: "Courier New", Courier, monospace;
+    font-family: "consolas", "Courier New", Courier, monospace;
     font-weight: 400;
     font-style: normal;
 
@@ -39,17 +42,30 @@ function App() {
     const ref = useRef(null);
     const debugRef = useRef(null);
 
+    const [active, setActive] = useState(0);
+    const [quickSlotItems, setQuickSlotItems] = useState([]);
+
     useEffect(() => {
-        if (ref && ref.current && debugRef && debugRef.current) {
-            createGame(ref.current, debugRef.current);
+        if (isCreated() === false && ref && debugRef) {
+            const scene = createGame(ref.current, debugRef.current);
+
+            scene.addEventListener("playerSlotChange", (event) => {
+                setActive(event.value);
+            });
+            scene.addEventListener("playerSlotListChange", (event) => {
+                setQuickSlotItems(event.value);
+            });
+
+            Log.info("Game Created");
         }
-    }, [ref]);
+    }, [ref, debugRef]);
 
     const stats = useStats();
 
     return (
         <Container>
             {stats}
+            <QuickBar slots={quickSlotItems} active={active} />
             <Debug ref={debugRef}></Debug>
             <Canvas ref={ref} />
         </Container>

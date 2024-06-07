@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     disableContextMenu,
     registerCanvasInputEvent,
@@ -16,11 +17,11 @@ import Stats from "three/addons/libs/stats.module.js";
  * @param {HTMLCanvasElement} canvas
  * @param {HTMLDivElement} debug
  */
-export async function createGame(canvas, debug) {
+export function createGame(canvas, debug) {
     // 디버그 요소 등록
     Log.element = debug;
 
-    // 엔진 초기화 및 프레임 업데이트 시작
+    // GameScene을 생성하고 RinEngine에 등록
     createScene(canvas, GameScene);
 
     // 브라우저 visibilitychange 이벤트 등록
@@ -34,14 +35,28 @@ export async function createGame(canvas, debug) {
 
     // 컨텍스트 메뉴 (마우스 우클릭 메뉴) 비활성화
     disableContextMenu(canvas);
+
+    return RinEngine.scene;
+}
+
+export function isCreated() {
+    return RinEngine.scene !== null;
 }
 
 export function useStats() {
+    const [element, setElement] = useState(null);
+
     if (RinEngine.stats === null) {
         RinEngine.stats = new Stats();
+
+        // State에 JSX.Element 구겨넣기
+        // 나중에 더 좋은 방법으로 바꾸기....
+        setElement(
+            <div ref={(ref) => ref.appendChild(RinEngine.stats.dom)}></div>
+        );
     }
 
-    return <div ref={(ref) => ref.appendChild(RinEngine.stats.dom)}></div>;
+    return element;
 }
 
 window.THREE = THREE;

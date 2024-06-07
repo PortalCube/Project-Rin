@@ -56,7 +56,7 @@ export class Player extends Entity {
 
     active = false;
 
-    range = 4;
+    range = 8;
 
     // 1초에 1블록 이동하는 속도를 지정
     baseSpeed = 100;
@@ -80,7 +80,7 @@ export class Player extends Entity {
     jumpDelay = 0;
     blockDelay = 0;
 
-    fly = true;
+    fly = false;
     swim = false;
     jumpable = false;
 
@@ -139,6 +139,16 @@ export class Player extends Entity {
         this.scene.scene.add(axis);
         this.scene.scene.add(selection);
         // this.scene.scene.add(line);
+    }
+
+    onLoad() {
+        Log.info("Player loaded");
+        this.scene.dispatchEvent({
+            type: "playerSlotListChange",
+            value: this.quickSlot,
+        });
+
+        this.active = true;
     }
 
     onFrameUpdate(deltaTime) {
@@ -255,6 +265,10 @@ export class Player extends Entity {
                 this.scene.scene.remove(obj);
             }
             this.debugObjects = [];
+        }
+
+        if (this.active === false) {
+            return;
         }
 
         // 플레이어 이동
@@ -447,17 +461,16 @@ export class Player extends Entity {
 
         this.swim = collisionWithLiquid;
 
-        Log.watch("swim", this.swim);
-
         const player = new THREE.Vector3(
             this.position.x,
-            this.position.y - PLAYER_SIZE[1] * (3 / 4),
+            this.position.y - PLAYER_SIZE[1] * (3 / 4) - 0.5,
             this.position.z
         );
         Log.watchVector("pos", player);
         Log.watchVector("vel", this.velocity);
         Log.watch("speed", this.velocity.length().toFixed(2));
         Log.watch("jumpable", this.jumpable);
+        Log.watch("isSwim", this.swim);
     }
 
     cameraMovement(deltaTime) {
@@ -485,14 +498,20 @@ export class Player extends Entity {
         if (RinInput.wheelDelta > 0) {
             // 아래로 내림 -> 다음
             this.currentSlot = (this.currentSlot + 1) % this.quickSlot.length;
+            this.scene.dispatchEvent({
+                type: "playerSlotChange",
+                value: this.currentSlot,
+            });
         } else if (RinInput.wheelDelta < 0) {
             // 위로 올림 -> 이전
             this.currentSlot =
                 (this.currentSlot - 1 + this.quickSlot.length) %
                 this.quickSlot.length;
+            this.scene.dispatchEvent({
+                type: "playerSlotChange",
+                value: this.currentSlot,
+            });
         }
-        Log.watch("wheel", RinInput.wheelDelta);
-        Log.watch("currentSlot", this.currentSlot);
     }
 
     /**

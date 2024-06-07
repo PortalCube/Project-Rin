@@ -27,15 +27,11 @@ export class GameScene extends RinScene {
      */
     world = null;
 
-    count = 0;
-
     constructor() {
         super();
     }
 
     onLoad() {
-        super.onLoad();
-
         // Three.js Scene 생성
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000);
@@ -55,22 +51,12 @@ export class GameScene extends RinScene {
         // World의 Mesh를 만들어서 Scene에 render
         this.world.render();
 
+        super.onLoad();
+
         Log.info("GameScene Loaded");
     }
 
     onUpdate(deltaTime) {
         super.onUpdate(deltaTime);
-
-        // if (this.player.active === false) {
-        //     this.player.active = true;
-        // }
-
-        if (this.count <= c) {
-            this.count++;
-
-            if (this.count === c) {
-                this.player.active = true;
-            }
-        }
     }
 }

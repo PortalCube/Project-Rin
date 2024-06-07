@@ -22,6 +22,7 @@ export function registerVisibilityChangeEvent() {
 export function registerResizeEvent() {
     window.addEventListener("resize", () => {
         if (RinEngine.scene) {
+            // 브라우저 크기가 변경될 때 Scene도 함께 크기를 변경
             const width = window.innerWidth;
             const height = window.innerHeight;
 
@@ -33,6 +34,7 @@ export function registerResizeEvent() {
 
 export function registerCanvasInputEvent(canvas) {
     canvas.addEventListener("click", () => {
+        // 사용자 입력을 감지하고 포인터 잠금 업데이트
         RinInput._userGesture = true;
         RinInput.updatePointerLock();
     });
@@ -40,6 +42,7 @@ export function registerCanvasInputEvent(canvas) {
 
 export function disableContextMenu(canvas) {
     canvas.addEventListener("contextmenu", (e) => {
+        // 마우스 우클릭 했을때 컨텍스트 메뉴 안뜨도록
         e.preventDefault();
     });
 }

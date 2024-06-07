@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { createEnum } from "../util.js";
 import { LIQUID_SIZE, TILE_MAP_SIZE } from "../setting.js";
 
-import BlockData from "../items/blocks.json";
+import BlockData from "../../assets/json/blocks.json";
 
 //prettier-ignore
 export const Direction = createEnum({
@@ -33,7 +33,7 @@ export function getDirectionVector(direction) {
     }
 }
 
-function getUVOffset(id, tileSize = TILE_MAP_SIZE) {
+export function getUVOffset(id, tileSize = TILE_MAP_SIZE) {
     const x = id % tileSize;
     const y = tileSize - Math.floor(id / tileSize) - 1;
 
@@ -106,8 +106,6 @@ export class Block {
     static get Direction() {
         return Direction;
     }
-
-    static getDirectionVector = getDirectionVector;
 
     constructor(
         chunk,
@@ -234,7 +232,7 @@ export class Block {
             // 행렬곱은 아래부터 위로 역순으로 적용
 
             const matrix = new THREE.Matrix4();
-            const directionVector = Block.getDirectionVector(direction);
+            const directionVector = getDirectionVector(direction);
 
             // Translate
 

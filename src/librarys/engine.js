@@ -94,6 +94,7 @@ export const RinEngine = {
 /**
  * RinScene을 불러옵니다.
  * @param {function} scene
+ * @returns {RinScene}
  */
 export function loadScene(Scene) {
     if (RinEngine.scene) {
@@ -105,13 +106,17 @@ export function loadScene(Scene) {
 
     RinEngine.scene = new Scene();
     RinEngine.scene.status = RinScene.SceneStatus.Loading;
-    RinEngine.scene.onLoad();
-    RinEngine.scene.status = RinScene.SceneStatus.Loaded;
+    // RinEngine.scene.onLoad();
+    // RinEngine.scene.status = RinScene.SceneStatus.Loaded;
+
+    return RinEngine.scene;
 }
 
 /**
  * WebGL Scene을 초기화하고 기본 Scene을 불러옵니다.
  * @param {HTMLCanvasElement} canvas
+ * @param {function} Scene
+ * @returns {RinScene}
  */
 export function createScene(canvas, Scene = DefaultScene) {
     RinEngine.renderer = new THREE.WebGLRenderer({ canvas });
@@ -126,10 +131,12 @@ export function createScene(canvas, Scene = DefaultScene) {
     RinEngine.texture.minFilter = THREE.NearestMipmapLinearFilter;
 
     // 기본 Scene을 불러옵니다.
-    loadScene(Scene);
+    const scene = loadScene(Scene);
 
     // 프레임 업데이트 함수 시작
     requestAnimationFrame(frameUpdate);
+
+    return scene;
 }
 
 /**
@@ -192,6 +199,12 @@ function sceneUpdate(deltaTime) {
     RinInput._preUpdate();
 
     const status = RinEngine.scene.status;
+
+    // Scene이 로드되지 않았다면 불러오기
+    if (status === RinScene.SceneStatus.Loading) {
+        RinEngine.scene.onLoad();
+        RinEngine.scene.status = RinScene.SceneStatus.Loaded;
+    }
 
     if (status === RinScene.SceneStatus.Loaded) {
         RinEngine.scene.onFrameUpdate(deltaTime);
