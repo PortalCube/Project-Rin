@@ -8,6 +8,9 @@ const Container = styled.div`
     justify-content: center;
     align-items: center;
 
+    /* 텍스트 드래그 비활성화 */
+    user-select: none;
+
     width: 100%;
     height: 100%;
 `;
