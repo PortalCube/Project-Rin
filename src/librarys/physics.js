@@ -2,7 +2,6 @@ import * as THREE from "three";
 import { getHalfDecimal, round } from "./util.js";
 import { Direction, getDirectionVector } from "./worlds/block.js";
 import { PLAYER_SIZE } from "./setting.js";
-import { World } from "./worlds/world.js";
 
 // three.js에도 Raycaster가 구현되어 있지만, three.js의 Raycaster를 적용하면 Scene에 블록이 너무 많을때 성능이 급격히 떨어지는 이슈가 있었습니다.
 // world의 블록 데이터로 간단한 레이캐스트를 수행함으로서 불필요한 연산을 줄여 레이캐스트의 성능을 최적화했습니다.
@@ -180,17 +179,17 @@ export function getPlayerIntersectCoordinates(position) {
     const minZ = round(position.z - PLAYER_SIZE[2] / 2);
     const maxZ = round(position.z + PLAYER_SIZE[2] / 2);
 
-    const coodinates = [];
+    const coordinates = [];
 
     for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
             for (let z = minZ; z <= maxZ; z++) {
-                coodinates.push(new THREE.Vector3(x, y, z));
+                coordinates.push(new THREE.Vector3(x, y, z));
             }
         }
     }
 
-    return coodinates;
+    return coordinates;
 }
 
 /**
@@ -199,16 +198,10 @@ export function getPlayerIntersectCoordinates(position) {
  * @param {THREE.Vector3} coordinate
  * @returns {THREE.Vector3}
  */
-export function getBlockCollision(position, coodinate) {
-    const cx = coodinate.x;
-    const cy = coodinate.y;
-    const cz = coodinate.z;
-
-    // const _py = position.y;
-    // const py = Math.max(
-    //     _py - PLAYER_SIZE[1] * (3 / 4),
-    //     Math.min(_py + PLAYER_SIZE[1] * (1 / 4), cy)
-    // );
+export function getBlockCollision(position, coordinate) {
+    const cx = coordinate.x;
+    const cy = coordinate.y;
+    const cz = coordinate.z;
 
     const px = position.x;
     const py = position.y - PLAYER_SIZE[1] * (1 / 4);
@@ -230,25 +223,30 @@ export function getBlockCollision(position, coodinate) {
         return null;
     }
 
+    const overlapX = PLAYER_SIZE[0] / 2 - Math.abs(dx);
     const overlapY = PLAYER_SIZE[1] / 2 - Math.abs(dy);
-    const overlapXZ = PLAYER_SIZE[0] / 2 - r;
+    const overlapZ = PLAYER_SIZE[2] / 2 - Math.abs(dz);
 
     let normal = null;
-    let distance = 0;
+    let length = 0;
 
-    if (overlapY < overlapXZ) {
+    if (overlapX < overlapY && overlapX < overlapZ) {
+        normal = new THREE.Vector3(-Math.sign(dx), 0, 0);
+        length = overlapX;
+    } else if (overlapY < overlapX && overlapY < overlapZ) {
         normal = new THREE.Vector3(0, -Math.sign(dy), 0);
-        distance = overlapY;
+        length = overlapY;
     } else {
-        normal = new THREE.Vector3(-dx, 0, -dz).normalize();
-        distance = overlapXZ;
+        normal = new THREE.Vector3(0, 0, -Math.sign(dz));
+        length = overlapZ;
     }
 
     return {
-        coodinate: coodinate,
+        coordinate: coordinate,
         point: point,
         normal: normal,
-        distance: distance,
+        distance: point.distanceTo(position),
+        length: length,
     };
 }
 
@@ -259,11 +257,11 @@ export function getBlockCollision(position, coodinate) {
  * @returns {Object[]}
  */
 export function checkCollision(position, world) {
-    const coodinates = getPlayerIntersectCoordinates(position);
+    const coordinates = getPlayerIntersectCoordinates(position);
 
     const collisions = [];
 
-    for (const coordinate of coodinates) {
+    for (const coordinate of coordinates) {
         const x = coordinate.x;
         const y = coordinate.y;
         const z = coordinate.z;
@@ -274,16 +272,22 @@ export function checkCollision(position, world) {
             const collision = getBlockCollision(position, coordinate);
 
             if (collision !== null) {
-                const sameNormalCollision = collisions.find((item) =>
+                collision.block = block;
+
+                const duplicatedCollisionIndex = collisions.findIndex((item) =>
                     item.normal.equals(collision.normal)
                 );
 
-                if (sameNormalCollision === undefined) {
+                if (duplicatedCollisionIndex !== -1) {
+                    // 동일한 normal을 가진 collision이 이미 존재하면, 액체인 경우에만 덮어씌우기
+                    if (collisions[duplicatedCollisionIndex].block.isLiquid) {
+                        collisions[duplicatedCollisionIndex] = collision;
+                    }
+                } else {
                     collisions.push(collision);
                 }
             }
         }
     }
-
     return collisions;
 }

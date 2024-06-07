@@ -1,22 +1,23 @@
 import * as THREE from "three";
 import {
+    BLOCK_SET_DELAY,
     CAMERA_FAR,
     CAMERA_FOV,
     CAMERA_NEAR,
     GROUND_MAX_LEVEL,
+    JUMP_DELAY,
     PLAYER_SIZE,
 } from "../setting.js";
 import { RinEngine } from "../engine.js";
 import { Log } from "../log.js";
 import { RinInput } from "../input.js";
-import { clamp, rotateVector3, round } from "../util.js";
+import { clamp, rotateVector3 } from "../util.js";
 import { Entity } from "./entity.js";
 
 import selectionVertexShader from "../../assets/shaders/selection.vert?raw";
 import selectionFragmentShader from "../../assets/shaders/selection.frag?raw";
 import {
     checkCollision,
-    getBlockCollision,
     getPlayerIntersectCoordinates,
     worldRaycast,
 } from "../physics.js";
@@ -30,6 +31,7 @@ const selection = new THREE.Mesh(
         vertexShader: selectionVertexShader,
         fragmentShader: selectionFragmentShader,
         transparent: true,
+        depthTest: false,
     })
 );
 
@@ -38,9 +40,13 @@ const axis = new THREE.AxesHelper(2);
 
 // create wireframe
 // const geometry = new THREE.BoxGeometry(...PLAYER_SIZE);
-// // const geometry = new THREE.CylinderGeometry(...PLAYER_SIZE);
-// const wireframe = new THREE.WireframeGeometry(geometry);
-// const line = new THREE.LineSegments(wireframe);
+const geometry = new THREE.CylinderGeometry(
+    PLAYER_SIZE[0] / 2,
+    PLAYER_SIZE[0] / 2,
+    PLAYER_SIZE[1]
+);
+const wireframe = new THREE.WireframeGeometry(geometry);
+const line = new THREE.LineSegments(wireframe);
 
 export class Player extends Entity {
     /**
@@ -64,13 +70,18 @@ export class Player extends Entity {
     maxSpeed = 400;
     maxRunSpeed = 1000;
     maxFallSpeed = 3000;
+    maxSwimFallSpeed = 1000;
     jumpForce = 830;
+    swimJumpForce = 280;
     runSpeed = 2.5;
+    swimSpeed = 0.6;
     lookSpeed = (Math.PI * 2) / 1200;
 
+    jumpDelay = 0;
     blockDelay = 0;
 
     fly = true;
+    swim = false;
     jumpable = false;
 
     /**
@@ -78,13 +89,23 @@ export class Player extends Entity {
      */
     velocity = null;
     damping = 1 / (this.baseSpeed * 10);
+    swimDamping = 1 / (this.baseSpeed * 0.1);
     gravity = 9.80665 * 3 * this.baseSpeed;
 
     horizontalAngle = 0;
     verticalAngle = 0;
 
+    quickSlot = [1, 2, 3, 4, 5, 12, 20, 45];
+    currentSlot = 0;
+
+    debugObjects = [];
+
     get position() {
         return this.instance.position;
+    }
+
+    get equippedBlock() {
+        return this.quickSlot[this.currentSlot];
     }
 
     get blockPosition() {
@@ -111,7 +132,6 @@ export class Player extends Entity {
         );
 
         this.instance = scene.camera;
-        this.instance.position.z = 3;
         this.instance.position.y = GROUND_MAX_LEVEL + 10;
 
         this.velocity = new THREE.Vector3(0, 0, 0);
@@ -131,6 +151,8 @@ export class Player extends Entity {
         // 카메라 이동
         this.cameraMovement(deltaTime);
 
+        this.scrollInput(deltaTime);
+
         // 플레이어 이동 벡터 계산
         this.inputVector = this.movementInput(deltaTime);
 
@@ -138,6 +160,10 @@ export class Player extends Entity {
 
         if (this.blockDelay > 0) {
             this.blockDelay -= deltaTime;
+        }
+
+        if (this.jumpDelay > 0) {
+            this.jumpDelay -= deltaTime;
         }
 
         if (pointingBlock && pointingBlock.distance < this.range) {
@@ -157,7 +183,7 @@ export class Player extends Entity {
 
                 this.scene.world.setBlock(x, y, z, 0);
 
-                this.blockDelay = 0.25;
+                this.blockDelay = BLOCK_SET_DELAY;
             }
 
             if (
@@ -179,9 +205,9 @@ export class Player extends Entity {
                 const y = coordinate.y;
                 const z = coordinate.z;
 
-                this.scene.world.setBlock(x, y, z, 20);
+                this.scene.world.setBlock(x, y, z, this.equippedBlock);
 
-                this.blockDelay = 0.25;
+                this.blockDelay = BLOCK_SET_DELAY;
             }
         } else {
             axis.visible = false;
@@ -191,8 +217,9 @@ export class Player extends Entity {
         // 디버그 로그 띄우기
         if (RinInput.getKeyDown("Backquote")) {
             Log.info(this.instance.position);
-            Log.info(RinEngine.renderer.info);
-            Log.info(RinEngine.renderer.info.render);
+            if (pointingBlock) {
+                Log.info(pointingBlock.coordinate);
+            }
         }
 
         // 포인터 잠금 toggle
@@ -206,12 +233,30 @@ export class Player extends Entity {
             this.jumpable = false;
         }
 
-        // line.position.copy(
-        //     this.instance.position.clone().add(new THREE.Vector3(0, -0.5, 0))
-        // );
+        // collision wireframe
+        line.position.copy(
+            this.instance.position
+                .clone()
+                .add(new THREE.Vector3(0, -PLAYER_SIZE[1] * (1 / 4), 0))
+        );
     }
 
     onFixedUpdate(fixedDeltaTime) {
+        if (this.debugObjects.length > 0) {
+            for (const obj of this.debugObjects) {
+                if (obj.geometry) {
+                    obj.geometry.dispose();
+                }
+
+                if (obj.material) {
+                    obj.material.dispose();
+                }
+
+                this.scene.scene.remove(obj);
+            }
+            this.debugObjects = [];
+        }
+
         // 플레이어 이동
         this.playerMovement(fixedDeltaTime);
     }
@@ -255,9 +300,18 @@ export class Player extends Entity {
         }
 
         // 점프
-        if (RinInput.getKeyDown("Space") && this.jumpable) {
-            this.velocity.y += this.jumpForce;
-            this.jumpable = false;
+        if (RinInput.getKey("Space") && this.jumpDelay <= 0) {
+            if (this.swim) {
+                // 수영하고 있을 때
+                this.velocity.y += this.swimJumpForce;
+                this.jumpable = false;
+                this.jumpDelay = JUMP_DELAY;
+            } else if (this.jumpable) {
+                // 일반 점프
+                this.velocity.y += this.jumpForce;
+                this.jumpable = false;
+                this.jumpDelay = JUMP_DELAY;
+            }
         }
 
         // 이동 벡터를 플레이어가 보는 방향으로 회전
@@ -292,19 +346,33 @@ export class Player extends Entity {
         // 걸어다니는 경우 y 가속도를 별도로 관리
         if (this.fly === false) {
             // 걸어다니면 y에 중력 가속도 적용
-            _yVelocity -= this.gravity * deltaTime;
 
             // velocity 크기 제한시 y 가속도를 포함하여 계산하지 않도록 y를 0으로
             this.velocity.y = 0;
 
-            // y 가속도 제한
-            if (Math.abs(_yVelocity) > this.maxFallSpeed) {
-                _yVelocity = Math.sign(_yVelocity) * this.maxFallSpeed;
+            if (this.swim) {
+                _yVelocity -= this.gravity * 0.5 * deltaTime;
+
+                // y 가속도 제한
+                if (Math.abs(_yVelocity) > this.maxSwimFallSpeed) {
+                    _yVelocity = Math.sign(_yVelocity) * this.maxSwimFallSpeed;
+                }
+            } else {
+                _yVelocity -= this.gravity * deltaTime;
+
+                // y 가속도 제한
+                if (Math.abs(_yVelocity) > this.maxFallSpeed) {
+                    _yVelocity = Math.sign(_yVelocity) * this.maxFallSpeed;
+                }
             }
         }
 
         // 가속도 감속
-        this.velocity.multiplyScalar(Math.pow(this.damping, deltaTime));
+        if (this.swim) {
+            this.velocity.multiplyScalar(Math.pow(this.swimDamping, deltaTime));
+        } else {
+            this.velocity.multiplyScalar(Math.pow(this.damping, deltaTime));
+        }
 
         // velocity 크기 제한
         if (this.velocity.length() > maxSpeed) {
@@ -321,8 +389,8 @@ export class Player extends Entity {
             this.velocity.y = _yVelocity;
         }
 
-        // y 가속도가 0이 아니면 점프 불가
-        if (this.velocity.y !== 0) {
+        // y 가속도가 0 이상이면 점프 불가
+        if (this.velocity.y > 0) {
             this.jumpable = false;
         }
 
@@ -332,43 +400,63 @@ export class Player extends Entity {
             .clone()
             .multiplyScalar((1 / this.baseSpeed) * deltaTime);
 
-        this.instance.position.add(vector);
+        if (this.swim) {
+            vector.multiplyScalar(this.swimSpeed);
+        }
+
+        const predictedPosition = this.instance.position.clone().add(vector);
+
+        let collisionWithLiquid = false;
 
         // 걸어다니면 충돌 체크 및 처리
         if (this.fly === false) {
             const collisions = checkCollision(
-                this.instance.position,
+                predictedPosition,
                 this.scene.world
             );
 
             for (const collision of collisions) {
                 const normal = collision.normal;
-                const distance = collision.distance;
-                const inverse = normal.clone().multiplyScalar(distance);
+                const length = collision.length;
+                const inverse = normal.clone().multiplyScalar(length);
+                const block = collision.block;
+
+                if (block.isLiquid) {
+                    collisionWithLiquid = true;
+                    continue;
+                }
 
                 // 바닥 혹은 천장에 닿은 경우에 따라서, 점프 가능 여부와 y velocity를 조정
+
                 if (normal.y > 0) {
                     if (this.velocity.y < 0) {
                         this.velocity.y = 0;
+                        this.jumpable = true;
                     }
-                    this.jumpable = true;
                 } else if (normal.y < 0) {
                     if (this.velocity.y > 0) {
                         this.velocity.y = 0;
                     }
                 }
 
-                this.instance.position.add(inverse);
+                vector.add(inverse);
             }
         }
 
-        const p = this.instance.position
-            .clone()
-            .add(new THREE.Vector3(0, -PLAYER_SIZE[1] * (3 / 4), 0));
-        const v = this.velocity.clone();
-        Log.watchVector("pos", p);
-        Log.watchVector("vel", v);
-        Log.watch("speed", v.length().toFixed(2));
+        this.instance.position.add(vector);
+
+        this.swim = collisionWithLiquid;
+
+        Log.watch("swim", this.swim);
+
+        const player = new THREE.Vector3(
+            this.position.x,
+            this.position.y - PLAYER_SIZE[1] * (3 / 4),
+            this.position.z
+        );
+        Log.watchVector("pos", player);
+        Log.watchVector("vel", this.velocity);
+        Log.watch("speed", this.velocity.length().toFixed(2));
         Log.watch("jumpable", this.jumpable);
     }
 
@@ -391,6 +479,20 @@ export class Player extends Entity {
 
         this.instance.rotateY(this.horizontalAngle);
         this.instance.rotateX(this.verticalAngle);
+    }
+
+    scrollInput(deltaTime) {
+        if (RinInput.wheelDelta > 0) {
+            // 아래로 내림 -> 다음
+            this.currentSlot = (this.currentSlot + 1) % this.quickSlot.length;
+        } else if (RinInput.wheelDelta < 0) {
+            // 위로 올림 -> 이전
+            this.currentSlot =
+                (this.currentSlot - 1 + this.quickSlot.length) %
+                this.quickSlot.length;
+        }
+        Log.watch("wheel", RinInput.wheelDelta);
+        Log.watch("currentSlot", this.currentSlot);
     }
 
     /**
@@ -425,13 +527,13 @@ export class Player extends Entity {
 
             const block = this.scene.world.getBlock(x, y, z);
 
-            if (block && block.active) {
+            if (block && block.active && block.isLiquid === false) {
                 const point = intersect.point;
                 const distance = intersect.distance;
                 const coordinate = intersect.coordinate;
                 const normal = intersect.normal;
 
-                return { point, distance, coordinate, normal };
+                return { point, distance, coordinate, normal, block };
             }
         }
 
