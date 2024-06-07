@@ -5,6 +5,7 @@ import {
     GROUND_MAX_LEVEL,
     GROUND_MIN_LEVEL,
     MAP_HEIGHT,
+    SEA_LEVEL,
     TILE_MAP_SIZE,
 } from "../setting.js";
 import { getChunkCoordinate, getChunkIndex, getMinMax } from "../util.js";
@@ -13,7 +14,7 @@ import { RinEngine } from "../engine.js";
 
 import blockVertexShader from "../../assets/shaders/block.vert?raw";
 import blockFragmentShader from "../../assets/shaders/block.frag?raw";
-import { create2DNoiseFunction } from "../perlin_noise.js";
+import { create2DNoiseFunction } from "../perlin-noise.js";
 
 export class World {
     /**
@@ -32,11 +33,6 @@ export class World {
     mesh = null;
 
     /**
-     * @type {THREE.InstancedMesh}
-     */
-    transparentMesh = null;
-
-    /**
      * @type {Map} 렌더링 정보 배열
      */
     renderInfos = null;
@@ -45,6 +41,11 @@ export class World {
      * @type {number} 렌더링 정보 갯수
      */
     renderCount = 0;
+
+    /**
+     * @type {THREE.Vector3} directional light의 방향
+     */
+    lightDirection = new THREE.Vector3(1, 1, 0);
 
     width = 0;
     height = 0;
@@ -58,6 +59,29 @@ export class World {
 
     constructor(scene) {
         this.scene = scene;
+
+        scene.addEventListener("frameUpdate", (event) =>
+            this.onFrameUpdate(event.deltaTime)
+        );
+    }
+
+    onFrameUpdate(deltaTime) {
+        if (this.mesh) {
+            /**
+             * @type {THREE.PerspectiveCamera}
+             */
+            const camera = this.scene.player.instance;
+            const lightDir = this.lightDirection.clone();
+
+            // camera.matrixWorld        -> camera 좌표계를  world 좌표계로 변환 행렬
+            // camera.matrixInverseWorld ->  world 좌표계를 camera 좌표계로 변환 행렬
+
+            // directional light의 방향은 world 좌표계의 방향이므로 camera 좌표계로 변환하여 사용
+            lightDir.transformDirection(camera.matrixWorldInverse);
+
+            // 갱신된 directional light의 방향을 셰이더로 넘겨주기
+            this.mesh.material.uniforms.lightDir.value = lightDir.toArray();
+        }
     }
 
     /**
@@ -97,15 +121,27 @@ export class World {
         const getLevelNoise = create2DNoiseFunction({
             min: GROUND_MIN_LEVEL,
             max: GROUND_MAX_LEVEL,
+            frequency: 0.01,
             octaves: 12,
         });
 
-        const getTemperatureNoise = create2DNoiseFunction({
-            min: -3,
-            max: 7,
-            amplitude: 1,
-            frequency: 0.01075,
+        const getBeachNoise = create2DNoiseFunction({
+            min: 0,
+            max: 1,
+            shiftX: 1,
+            shiftY: 2,
+            frequency: 0.03,
             octaves: 8,
+        });
+
+        const getTemperatureNoise = create2DNoiseFunction({
+            min: 0,
+            max: 1,
+            amplitude: 1,
+            frequency: 0.065,
+            octaves: 16,
+            shiftX: 100000,
+            shiftY: 100000,
         });
 
         for (let x = this.minWorldValue; x <= this.maxWorldValue; x++) {
@@ -114,31 +150,47 @@ export class World {
                 const _x = x - this.minWorldValue;
                 const _z = z - this.minWorldValue;
                 const level = Math.floor(getLevelNoise(_x, _z));
-                const temperature = Math.floor(getTemperatureNoise(_x, _z));
+                const temperature = getTemperatureNoise(_x, _z);
+                const beach = getBeachNoise(_x, _z);
+                const isOcean = level < SEA_LEVEL;
 
                 for (let y = 0; y < this.depth; y++) {
                     if (y < 2) {
-                        // y축이 2보다 작으면 베드락
+                        // # 월드 바닥
                         blockId = 7;
                     } else if (y < level - 3) {
-                        //level - 3보다 작으면 돌
+                        // # 깊은 지표면
                         blockId = 1;
                     } else if (y < level) {
-                        // level보다 작으면 흙
-                        blockId = temperature > 0 ? 3 : 12;
-                    } else if (y === level && level >= 28) {
-                        // level이면 잔디
-                        blockId = temperature > 0 ? 2 : 12;
-                    } else if (y < 28) {
-                        // level이 28보다 작을때, level부터 16까지 물로 채우기
-                        blockId = 9;
+                        // # 얕은 지표면
+                        if (isOcean) {
+                            blockId = 12;
+                        } else {
+                            blockId = 3;
+                        }
+                    } else if (y === level) {
+                        // # 지표면
+                        if (isOcean) {
+                            // 바다 바이옴
+                            blockId = temperature < 0.35 ? 3 : 12;
+                        } else if (level < SEA_LEVEL + 1) {
+                            // 해변
+                            blockId = beach < 0.6 ? 12 : 2;
+                        } else {
+                            blockId = 2;
+                        }
                     } else {
-                        // level보다 크면 공기
-                        blockId = 0;
+                        // # 지표면 위
+                        if (y <= SEA_LEVEL && isOcean) {
+                            // 바다 바이옴에서 SEA_LEVEL 이하
+                            blockId = 9;
+                        } else {
+                            blockId = 0;
+                        }
                     }
 
-                    const block = this.getBlock(x, y, z);
-                    block.id = blockId;
+                    // 블록 id를 지정
+                    this.getBlock(x, y, z).id = blockId;
                 }
             }
         }
@@ -215,55 +267,25 @@ export class World {
     buildMesh() {
         const planeGeometry = new THREE.PlaneGeometry();
         const geometry = new THREE.InstancedBufferGeometry();
-        const transparentGeometry = new THREE.InstancedBufferGeometry();
 
         // InstancedBufferGeometry에 PlaneGeometry의 attribute들을 복사
         geometry.setAttribute("position", planeGeometry.attributes.position);
-        geometry.setAttribute("normal", planeGeometry.attributes.normal);
+        geometry.setAttribute("uv", planeGeometry.attributes.uv);
         geometry.index = planeGeometry.index;
-
-        transparentGeometry.setAttribute(
-            "position",
-            planeGeometry.attributes.position
-        );
-        transparentGeometry.setAttribute(
-            "normal",
-            planeGeometry.attributes.normal
-        );
-        transparentGeometry.index = planeGeometry.index;
-
-        // UV
-        const uvs = [
-            0,
-            1 / TILE_MAP_SIZE,
-            1 / TILE_MAP_SIZE,
-            1 / TILE_MAP_SIZE,
-            0,
-            0,
-            1 / TILE_MAP_SIZE,
-            0,
-        ];
-        geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-        transparentGeometry.setAttribute(
-            "uv",
-            new THREE.Float32BufferAttribute(uvs, 2)
-        );
 
         // ShaderMaterial을 생성하고 blockShader, textureImage 적용
         const material = new THREE.ShaderMaterial({
             uniforms: {
+                lightDir: { value: [0.0, 0.0, 0.0] },
+                lightAmbient: { value: [0.8, 0.8, 0.8, 1.0] },
+                matDiffuse: { value: [0.5, 0.5, 0.5, 1.0] },
+                matSpecular: { value: [0.3, 0.3, 0.3, 0.3] },
+                matShininess: { value: 70 },
                 textureImage: {
                     value: RinEngine.texture,
                 },
-            },
-            vertexShader: blockVertexShader,
-            fragmentShader: blockFragmentShader,
-        });
-
-        const transparentMaterial = new THREE.ShaderMaterial({
-            uniforms: {
-                textureImage: {
-                    value: RinEngine.texture,
+                uvTileSize: {
+                    value: TILE_MAP_SIZE,
                 },
             },
             vertexShader: blockVertexShader,
@@ -277,13 +299,17 @@ export class World {
             this.renderCount
         );
 
-        mesh.renderOrder = -2;
+        // 월드가 가장 먼저 렌더링되도록 설정
+        mesh.renderOrder = -1;
 
         const uvOffsets = new Float32Array(this.renderCount * 2);
-        let index = 0;
+        const ambients = new Float32Array(this.renderCount);
+        const normals = new Float32Array(this.renderCount * 3);
 
+        let index = 0;
         let transparentItems = [];
 
+        // 불투명 블록에 대한 렌더링 정보를 배열에 먼저 넣기
         for (const renderBlockInfo of this.renderInfos.values()) {
             for (const info of renderBlockInfo.infos) {
                 if (info.transparent) {
@@ -294,17 +320,50 @@ export class World {
                 // index번째 instance에 instanceMatrix를 지정
                 mesh.setMatrixAt(index, info.matrix);
 
+                // ambient 정보를 배열에 넣기
+                ambients[index] = info.ambient;
+
                 // uvOffset 정보를 배열에 넣기
-                uvOffsets.set(info.uvOffset, index++ * 2);
+                uvOffsets.set(info.uvOffset, index * 2);
+
+                // normal 정보를 배열에 넣기
+                normals.set(info.normal.toArray(), index * 3);
+
+                index++;
             }
         }
 
-        // 각 instance에 대한 uvOffset을 InstancedBufferAttribute로 추가
+        // 투명 블록에 대한 렌더링 정보를 배열에 넣기
+        for (const info of transparentItems) {
+            // index번째 instance에 instanceMatrix를 지정
+            mesh.setMatrixAt(index, info.matrix);
+
+            // ambient 정보를 배열에 넣기
+            ambients[index] = info.ambient;
+
+            // uvOffset 정보를 배열에 넣기
+            uvOffsets.set(info.uvOffset, index * 2);
+
+            // normal 정보를 배열에 넣기
+            normals.set(info.normal.toArray(), index * 3);
+
+            index++;
+        }
+
+        geometry.setAttribute(
+            "ambient",
+            new THREE.InstancedBufferAttribute(ambients, 1)
+        );
         geometry.setAttribute(
             "uvOffset",
             new THREE.InstancedBufferAttribute(uvOffsets, 2)
         );
+        geometry.setAttribute(
+            "normal",
+            new THREE.InstancedBufferAttribute(normals, 3)
+        );
 
+        // 이전에 생성한 메쉬를 삭제
         if (this.mesh) {
             this.mesh.geometry.dispose();
             this.mesh.material.dispose();
@@ -312,46 +371,8 @@ export class World {
             this.scene.scene.remove(this.mesh);
         }
 
-        if (this.transparentMesh) {
-            this.transparentMesh.geometry.dispose();
-            this.transparentMesh.material.dispose();
-
-            this.scene.scene.remove(this.transparentMesh);
-        }
-
         this.mesh = mesh;
         this.scene.scene.add(mesh);
-
-        // 투명 블록을 위한 InstancedMesh 생성
-        if (transparentItems.length > 0) {
-            const mesh = new THREE.InstancedMesh(
-                transparentGeometry,
-                transparentMaterial,
-                transparentItems.length
-            );
-
-            mesh.renderOrder = -1;
-
-            const uvOffsets = new Float32Array(transparentItems.length * 2);
-            index = 0;
-
-            for (const info of transparentItems) {
-                // index번째 instance에 instanceMatrix를 지정
-                mesh.setMatrixAt(index, info.matrix);
-
-                // uvOffset 정보를 배열에 넣기
-                uvOffsets.set(info.uvOffset, index++ * 2);
-            }
-            // 각 instance에 대한 uvOffset을 InstancedBufferAttribute로 추가
-            transparentGeometry.setAttribute(
-                "uvOffset",
-                new THREE.InstancedBufferAttribute(uvOffsets, 2)
-            );
-
-            this.transparentMesh = mesh;
-            this.scene.scene.add(mesh);
-        }
-
         this.needRenderUpdate = false;
 
         return mesh;

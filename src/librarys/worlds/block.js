@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { createEnum, randomRange } from "../util.js";
-import { TILE_MAP_SIZE } from "../setting.js";
+import { createEnum } from "../util.js";
+import { LIQUID_SIZE, TILE_MAP_SIZE } from "../setting.js";
 
 import BlockData from "../items/blocks.json";
 
@@ -34,9 +34,8 @@ export function getDirectionVector(direction) {
 }
 
 function getUVOffset(id, tileSize = TILE_MAP_SIZE) {
-    const size = 1 / tileSize;
-    const x = (id % tileSize) * size;
-    const y = (tileSize - Math.floor(id / tileSize) - 1) * size;
+    const x = id % tileSize;
+    const y = tileSize - Math.floor(id / tileSize) - 1;
 
     return [x, y];
 }
@@ -98,6 +97,10 @@ export class Block {
 
     get info() {
         return this._info;
+    }
+
+    get isLiquid() {
+        return this._info?.liquid === true;
     }
 
     static get Direction() {
@@ -221,25 +224,60 @@ export class Block {
                 }
             }
 
+            // 블럭이 조금 더 자연스럽게 보이도록 X축 face의 앰비언트 라이트를 어둡게 지정
+            let ambient = 1.0;
+            if (direction === Direction.Right || direction === Direction.Left) {
+                ambient = 0.7;
+            }
+
             // 블록 instance의 instanceMatrix를 계산
             // 행렬곱은 아래부터 위로 역순으로 적용
 
             const matrix = new THREE.Matrix4();
             const directionVector = Block.getDirectionVector(direction);
 
-            // (3) block의 world coordinate로 translation
+            // Translate
+
+            // (4) block의 world coordinate로 translation
             matrix.multiply(
                 new THREE.Matrix4().makeTranslation(this.coordinate)
             );
 
-            // (2) block의 face의 위치로 translation
+            if (this.info?.liquid) {
+                // (3-A) 유체이고, 윗면 face는 (1 - LIQUID_SIZE) 만큼 아래로 내리기
+                if (direction === Direction.Up) {
+                    matrix.multiply(
+                        new THREE.Matrix4().makeTranslation(
+                            new THREE.Vector3(0, LIQUID_SIZE - 1, 0)
+                        )
+                    );
+                }
+
+                // (3-B) 유체이고, 옆면 face는 (1 - LIQUID_SIZE) / 2 만큼 아래로 내리기
+                if (
+                    direction === Direction.Right ||
+                    direction === Direction.Left ||
+                    direction === Direction.Front ||
+                    direction === Direction.Back
+                ) {
+                    matrix.multiply(
+                        new THREE.Matrix4().makeTranslation(
+                            new THREE.Vector3(0, (LIQUID_SIZE - 1) / 2, 0)
+                        )
+                    );
+                }
+            }
+
+            // (3) block의 face의 위치로 translation
             matrix.multiply(
                 new THREE.Matrix4().makeTranslation(
                     directionVector.multiplyScalar(0.5)
                 )
             );
 
-            // (1) block의 face의 방향으로 rotation
+            // Rotate
+
+            // (2) block의 face의 방향으로 rotation
             switch (direction) {
                 case Direction.Right:
                     matrix.multiply(new THREE.Matrix4().makeRotationY(PI_2));
@@ -260,14 +298,28 @@ export class Block {
                     break;
             }
 
+            // Scale
+
+            if (this.info?.liquid) {
+                // (1-A) 유체의 경우에는, X+, X-, Z+, Z- 방향의 face를 살짝 작게 만들기
+                if (
+                    direction === Direction.Right ||
+                    direction === Direction.Left ||
+                    direction === Direction.Front ||
+                    direction === Direction.Back
+                ) {
+                    matrix.multiply(
+                        new THREE.Matrix4().makeScale(1, LIQUID_SIZE, 1)
+                    );
+                }
+            }
+
             hash += 1 << direction;
 
             blockRenderInfos.push({
-                // coordinate: this.coordinate,
-                // direction: direction,
-
-                // 렌더링에 필수적인 정보
                 uvOffset: getUVOffset(textures[direction]),
+                normal: directionVector,
+                ambient: ambient,
                 matrix: matrix,
                 transparent: transparent,
             });

@@ -40,7 +40,8 @@
         "name": "water",
         "display_name": "물",
         "texture": 14,
-        "transparent": true
+        "transparent": true,
+        "liquid": true
     },
     {
         "id": 12,
