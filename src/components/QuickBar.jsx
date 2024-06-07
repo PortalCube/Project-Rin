@@ -25,6 +25,8 @@ const Item = styled.div`
     align-items: center;
     justify-content: center;
 
+    perspective: 1000px;
+
     &.select {
         background-color: #7f7f7f;
         outline: 4px solid #efefef;
@@ -32,46 +34,78 @@ const Item = styled.div`
 `;
 
 const Icon = styled.img`
-    width: 36px;
-    height: 36px;
+    position: absolute;
+
+    width: 24px;
+    height: 24px;
     object-fit: contain;
     flex-grow: 1;
     image-rendering: pixelated;
+
+    &.right {
+        transform-style: preserve-3d;
+        transform: rotateX(-30deg) rotateY(-45deg) translateZ(12px);
+    }
+
+    &.front {
+        transform-style: preserve-3d;
+        transform: rotateX(-30deg) rotateY(45deg) translateZ(12px);
+    }
+
+    &.up {
+        transform-style: preserve-3d;
+        transform: rotateX(-30deg) rotateY(45deg) rotateX(90deg)
+            translateZ(12px);
+    }
 `;
 
 const tilemapImage = new Image();
 tilemapImage.src = tilemap;
 
+function getTileImage(id, tileSize) {
+    const [x, y] = getUVOffset(id, tileSize);
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 16;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(
+        tilemapImage,
+        x * 16,
+        (16 - y - 1) * 16,
+        16,
+        16,
+        0,
+        0,
+        16,
+        16
+    );
+    return canvas.toDataURL();
+}
+
 function QuickBar({ slots, active }) {
     const items = slots.map((item, index) => {
         const itemData = BlockData.find((data) => data.id === item);
-        const textureId =
-            typeof itemData.texture === "object"
-                ? itemData.texture[0]
-                : itemData.texture;
-        const uvOffset = getUVOffset(textureId, 16);
 
-        const canvas = document.createElement("canvas");
-        canvas.width = 16;
-        canvas.height = 16;
+        let rightTexture = null; // X+
+        let upTexture = null; // Y+
+        let frontTexture = null; // Z+
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(
-            tilemapImage,
-            uvOffset[0] * 16,
-            (16 - uvOffset[1] - 1) * 16,
-            16,
-            16,
-            0,
-            0,
-            16,
-            16
-        );
-        const base64URL = canvas.toDataURL();
+        if (typeof itemData.texture === "object") {
+            rightTexture = getTileImage(itemData.texture[0]);
+            upTexture = getTileImage(itemData.texture[2]);
+            frontTexture = getTileImage(itemData.texture[4]);
+        } else {
+            rightTexture = getTileImage(itemData.texture);
+            upTexture = getTileImage(itemData.texture);
+            frontTexture = getTileImage(itemData.texture);
+        }
 
         return (
             <Item key={index} className={active === index ? "select" : ""}>
-                <Icon src={base64URL} />
+                <Icon className="right" src={rightTexture} />
+                <Icon className="up" src={upTexture} />
+                <Icon className="front" src={frontTexture} />
             </Item>
         );
     });
