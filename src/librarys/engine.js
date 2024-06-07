@@ -3,9 +3,8 @@ import { RinScene } from "./scenes/scene.js";
 import { DefaultScene } from "./scenes/default.js";
 import { RinInput } from "./input.js";
 
-import Stats from "three/addons/libs/stats.module.js";
+import tilemap from "../assets/textures/tilemap.png";
 
-import terrain from "../assets/textures/terrain.png";
 import { Log } from "./log.js";
 
 // 엔진 메인 object
@@ -122,7 +121,7 @@ export function createScene(canvas, Scene = DefaultScene) {
     RinInput.setPointerLock(true);
 
     // 텍스쳐 로드
-    RinEngine.texture = new THREE.TextureLoader().load(terrain);
+    RinEngine.texture = new THREE.TextureLoader().load(tilemap);
     RinEngine.texture.magFilter = THREE.NearestFilter;
     RinEngine.texture.minFilter = THREE.NearestMipmapLinearFilter;
 
