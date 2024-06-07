@@ -1,4 +1,5 @@
 import {
+    disableContextMenu,
     registerCanvasInputEvent,
     registerResizeEvent,
     registerVisibilityChangeEvent,
@@ -30,6 +31,9 @@ export async function createGame(canvas, debug) {
 
     // Canvas Input 이벤트 등록
     registerCanvasInputEvent(canvas);
+
+    // 컨텍스트 메뉴 (마우스 우클릭 메뉴) 비활성화
+    disableContextMenu(canvas);
 }
 
 export function useStats() {

@@ -37,3 +37,9 @@ export function registerCanvasInputEvent(canvas) {
         RinInput.updatePointerLock();
     });
 }
+
+export function disableContextMenu(canvas) {
+    canvas.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+    });
+}
