@@ -1,14 +1,3 @@
-/* JS에서 입력을 처리하기 위해서는 window 객체에 KeyboardEvent나 MouseEvent의 리스너를 등록해야 합니다.
- * RinScene 객체에서 직접 window에 이벤트 리스너를 등록하여 사용할 경우,
- * RinEngine의 Lifecycle에 따라서 사용자의 입력을 처리하지 않고 사용자가 입력하는 즉시 코드가 실행되게 됩니다.
- *
- * 따라서, RinEngine의 Lifecycle을 유지하기 위해서 별도의 RinInput 객체를 통해서 입력을 제어합니다.
- *
- * RinInput은 자체적으로 window에 이벤트 리스너를 등록하여 실시간으로 사용자의 입력 값을 업데이트하고,
- * RinEngine은 매 sceneUpdate마다 RinInput 객체에서 오래된 값 (keydown, keyup, pointerPositionDelta)들을 업데이트합니다.
- * RinScene의 오브젝트들은 매 update 주기마다 싱글톤 패턴으로 관리되는 RinInput 객체를 통해서 사용자의 입력을 처리합니다.
- */
-
 import { RinEngine } from "./engine.js";
 import { Log } from "./log.js";
 

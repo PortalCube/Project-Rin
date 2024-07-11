@@ -13,23 +13,6 @@ function getConstantVector(v) {
     return vectors[i];
 }
 
-function getConstantVector3D(v) {
-    const i = v % 8;
-
-    const vectors = [
-        [1.0, 1.0, 0.0],
-        [-1.0, 1.0, 0.0],
-        [-1.0, -1.0, 0.0],
-        [1.0, -1.0, 0.0],
-        [1.0, 0.0, 1.0],
-        [-1.0, 0.0, 1.0],
-        [-1.0, 0.0, -1.0],
-        [1.0, 0.0, -1.0],
-    ];
-
-    return vectors[i];
-}
-
 function fade(t) {
     return ((6 * t - 15) * t + 10) * t * t * t;
 }

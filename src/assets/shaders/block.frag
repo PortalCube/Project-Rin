@@ -18,10 +18,6 @@ void main() {
     // surface의 light 벡터
     vec3 L = normalize(lightDir);
 
-    // surface의 reflect 벡터
-    // reflect(L, N) -> 2.0 * dot(L, N) * N - L
-    vec3 R = reflect(-L, N);
-
     // surface의 view 벡터
     vec3 V = normalize(-fWorldPos);
 

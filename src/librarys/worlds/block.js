@@ -176,8 +176,8 @@ export class Block {
     }
 
     _getRenderInfos() {
-        // 비활성화된 블록은 렌더링하지 않음
-        if (this.active === false) {
+        // 공기가 아닌 복쉘 블록이 아니면, 렌더링 하지 않음
+        if (this.id <= 0) {
             return null;
         }
 
@@ -203,29 +203,29 @@ export class Block {
         for (let direction = 0; direction < 6; direction++) {
             const block = this.getNearBlock(direction);
 
-            // 블록의 face가 world border를 가리키는 경우 - 렌더링하지 않음
+            // 블록의 face가 world border를 가리키는 경우
             // if (block === null) {
+            //     // 렌더링하지 않음
             //     continue;
             // }
 
-            // 블록의 face가 다른 active 블록과 맞닿은 경우
-            if (block?.active === true) {
-                // 블록이 transparent하지 않은 경우
-                // 혹은 transparent하더라도 동일 블록인 경우
-                //  -> 렌더링하지 않음
+            // 블록의 face가 다른 복쉘 블록과 맞닿은 경우
+            if (block?.id > 0) {
+                // 맞닿은 블록이 transparent하지 않은 경우 렌더링 하지 않음
                 if (block.info?.transparent !== true) {
                     continue;
                 }
 
-                if (this.info?.transparent === true && block.id === this.id) {
+                // 맞닿은 블록이 transparent하더라도 동일 블록인 경우 렌더링 하지 않음
+                if (block.id === this.id) {
                     continue;
                 }
             }
 
-            // 블럭이 조금 더 자연스럽게 보이도록 X축 face의 앰비언트 라이트를 어둡게 지정
+            // 블럭이 조금 더 자연스럽게 보이도록 Z축 face의 앰비언트 라이트를 어둡게 지정
             let ambient = 1.0;
-            if (direction === Direction.Right || direction === Direction.Left) {
-                ambient = 0.7;
+            if (direction === Direction.Front || direction === Direction.Back) {
+                ambient = 0.85;
             }
 
             // 블록 instance의 instanceMatrix를 계산

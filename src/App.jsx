@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import styled from "styled-components";
-import { createGame, isCreated, useStats } from "./librarys/main.jsx";
+import { useGame, useStats } from "./librarys/main.jsx";
 import QuickBar from "./components/QuickBar.jsx";
+import DragAndDrop from "./components/DragAndDrop.jsx";
 import { Log } from "./librarys/log.js";
 
 const Container = styled.div`
@@ -41,31 +42,20 @@ const Canvas = styled.canvas`
 function App() {
     const ref = useRef(null);
     const debugRef = useRef(null);
-
-    const [active, setActive] = useState(0);
-    const [quickSlotItems, setQuickSlotItems] = useState([]);
+    const scene = useGame(ref);
+    const stats = useStats();
 
     useEffect(() => {
-        if (isCreated() === false && ref && debugRef) {
-            const scene = createGame(ref.current, debugRef.current);
-
-            scene.addEventListener("playerSlotChange", (event) => {
-                setActive(event.value);
-            });
-            scene.addEventListener("playerSlotListChange", (event) => {
-                setQuickSlotItems(event.value);
-            });
-
-            Log.info("Game Created");
+        if (debugRef && debugRef.current) {
+            Log.element = debugRef.current;
         }
-    }, [ref, debugRef]);
-
-    const stats = useStats();
+    });
 
     return (
         <Container>
             {stats}
-            <QuickBar slots={quickSlotItems} active={active} />
+            <DragAndDrop scene={scene} />
+            <QuickBar scene={scene} />
             <Debug ref={debugRef}></Debug>
             <Canvas ref={ref} />
         </Container>

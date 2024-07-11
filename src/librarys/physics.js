@@ -3,8 +3,8 @@ import { getHalfDecimal, round } from "./util.js";
 import { Direction, getDirectionVector } from "./worlds/block.js";
 import { PLAYER_SIZE } from "./setting.js";
 
-// three.js에도 Raycaster가 구현되어 있지만, three.js의 Raycaster를 적용하면 Scene에 블록이 너무 많을때 성능이 급격히 떨어지는 이슈가 있었습니다.
-// world의 블록 데이터로 간단한 레이캐스트를 수행함으로서 불필요한 연산을 줄여 레이캐스트의 성능을 최적화했습니다.
+// three.js에도 Raycaster가 구현되어 있지만, three.js의 Raycaster를 적용하면 Scene에 블록이 너무 많을때 성능이 급격히 떨어지는 이슈가 있음
+// world의 블록 데이터로 직접 레이캐스트를 수행하여 성능을 최적화
 
 /**
  * Intersect 정보를 반환합니다.

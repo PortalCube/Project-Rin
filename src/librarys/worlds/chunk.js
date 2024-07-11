@@ -53,7 +53,27 @@ export class Chunk {
                     const _y = y;
                     const _z = this.minZ + z;
 
-                    zList.push(new Block(this, 0, new Vector3(_x, _y, _z)));
+                    let outOfBound = false;
+
+                    if (
+                        _x < this.world.minWorldValue ||
+                        _x > this.world.maxWorldValue
+                    ) {
+                        outOfBound = true;
+                    }
+
+                    if (
+                        _z < this.world.minWorldValue ||
+                        _z > this.world.maxWorldValue
+                    ) {
+                        outOfBound = true;
+                    }
+
+                    if (outOfBound) {
+                        zList.push(null);
+                    } else {
+                        zList.push(new Block(this, 0, new Vector3(_x, _y, _z)));
+                    }
                 }
                 yList.push(zList);
             }
@@ -72,7 +92,9 @@ export class Chunk {
         for (const yList of this.blocks) {
             for (const zList of yList) {
                 for (const block of zList) {
-                    count += block.getRenderInfos(infos);
+                    if (block) {
+                        count += block.getRenderInfos(infos);
+                    }
                 }
             }
         }

@@ -9,8 +9,6 @@ import { Player } from "../entities/player.js";
 import { World } from "../worlds/world.js";
 import { Sky } from "../entities/sky.js";
 
-let c = 3;
-
 export class GameScene extends RinScene {
     /**
      * @type {Player}
@@ -38,7 +36,7 @@ export class GameScene extends RinScene {
 
         // 새로운 World 생성
         this.world = new World(this);
-        this.world.generate(16 * 10, MAP_HEIGHT);
+        this.world.generate(16 * 12, MAP_HEIGHT);
 
         // Player 생성
         this.player = new Player(this);

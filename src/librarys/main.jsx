@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     disableContextMenu,
     registerCanvasInputEvent,
@@ -13,34 +13,42 @@ import * as THREE from "three";
 import Stats from "three/addons/libs/stats.module.js";
 
 /**
- * 주어진 canvas element에 게임을 생성합니다.
- * @param {HTMLCanvasElement} canvas
- * @param {HTMLDivElement} debug
+ * 주어진 canvas ref에서 게임을 구동합니다.
+ * @param {React.MutableRefObject<null>} canvas
+ * @returns {GameScene}
  */
-export function createGame(canvas, debug) {
-    // 디버그 요소 등록
-    Log.element = debug;
+export function useGame(canvas) {
+    const [scene, setScene] = useState(null);
+    const [active, setActive] = useState(false);
 
-    // GameScene을 생성하고 RinEngine에 등록
-    createScene(canvas, GameScene);
+    useEffect(() => {
+        if (canvas && canvas.current && active === false) {
+            // GameScene을 생성하고 RinEngine에 등록
+            const scene = createScene(canvas.current, GameScene);
 
-    // 브라우저 visibilitychange 이벤트 등록
-    registerVisibilityChangeEvent();
+            // 브라우저 visibilitychange 이벤트 등록
+            registerVisibilityChangeEvent();
 
-    // 브라우저 resize 이벤트 등록
-    registerResizeEvent();
+            // 브라우저 resize 이벤트 등록
+            registerResizeEvent();
 
-    // Canvas Input 이벤트 등록
-    registerCanvasInputEvent(canvas);
+            // Canvas Input 이벤트 등록
+            registerCanvasInputEvent(canvas.current);
 
-    // 컨텍스트 메뉴 (마우스 우클릭 메뉴) 비활성화
-    disableContextMenu(canvas);
+            // 컨텍스트 메뉴 (마우스 우클릭 메뉴) 비활성화
+            disableContextMenu(canvas.current);
 
-    return RinEngine.scene;
-}
+            // 게임 상태를 true로 변경
+            setActive(true);
 
-export function isCreated() {
-    return RinEngine.scene !== null;
+            // Scene을 state에 저장
+            setScene(scene);
+
+            Log.info("Game Created");
+        }
+    }, [canvas, active]);
+
+    return scene;
 }
 
 export function useStats() {

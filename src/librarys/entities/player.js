@@ -95,7 +95,7 @@ export class Player extends Entity {
     horizontalAngle = 0;
     verticalAngle = 0;
 
-    quickSlot = [1, 2, 3, 4, 5, 12, 20, 45];
+    quickSlot = [1, 2, 3, 4, 5, 12, 20, 45, -1];
     currentSlot = 0;
 
     debugObjects = [];
@@ -166,8 +166,6 @@ export class Player extends Entity {
         // 플레이어 이동 벡터 계산
         this.inputVector = this.movementInput(deltaTime);
 
-        const pointingBlock = this.getPointingBlock();
-
         if (this.blockDelay > 0) {
             this.blockDelay -= deltaTime;
         }
@@ -176,61 +174,8 @@ export class Player extends Entity {
             this.jumpDelay -= deltaTime;
         }
 
-        if (pointingBlock && pointingBlock.distance < this.range) {
-            axis.visible = true;
-            selection.visible = true;
-
-            axis.position.copy(pointingBlock.point);
-            selection.position.copy(pointingBlock.coordinate);
-
-            if (
-                RinInput.getPointerDown(0) ||
-                (this.blockDelay <= 0 && RinInput.getPointer(0))
-            ) {
-                const x = pointingBlock.coordinate.x;
-                const y = pointingBlock.coordinate.y;
-                const z = pointingBlock.coordinate.z;
-
-                this.scene.world.setBlock(x, y, z, 0);
-
-                this.blockDelay = BLOCK_SET_DELAY;
-            }
-
-            if (
-                RinInput.getPointerDown(2) ||
-                (this.blockDelay <= 0 && RinInput.getPointer(2))
-            ) {
-                const normal = pointingBlock.normal;
-                const coordinate = pointingBlock.coordinate.clone().add(normal);
-
-                const intersects = getPlayerIntersectCoordinates(
-                    this.instance.position
-                );
-
-                if (intersects.some((item) => item.equals(coordinate))) {
-                    return;
-                }
-
-                const x = coordinate.x;
-                const y = coordinate.y;
-                const z = coordinate.z;
-
-                this.scene.world.setBlock(x, y, z, this.equippedBlock);
-
-                this.blockDelay = BLOCK_SET_DELAY;
-            }
-        } else {
-            axis.visible = false;
-            selection.visible = false;
-        }
-
-        // 디버그 로그 띄우기
-        if (RinInput.getKeyDown("Backquote")) {
-            Log.info(this.instance.position);
-            if (pointingBlock) {
-                Log.info(pointingBlock.coordinate);
-            }
-        }
+        // 블록 포인터 처리
+        this.handlePointing();
 
         // 포인터 잠금 toggle
         if (RinInput.getKeyDown("KeyP")) {
@@ -515,24 +460,142 @@ export class Player extends Entity {
     }
 
     /**
+     * 플레이어가 바라보고 있는 블록에 대한 로직을 처리합니다.
+     */
+    handlePointing() {
+        const pointingBlock = this.getPointingBlock();
+
+        // 3D Model 프리뷰를 숨기기
+        const previewModel = this.scene.world.previewModel;
+        previewModel.visible = false;
+
+        // 가리키는 블록이 없음
+        if (pointingBlock === null) {
+            axis.visible = false;
+            selection.visible = false;
+            return;
+        }
+
+        // 가리키는 블록이 너무 멀리 있음
+        if (pointingBlock.distance > this.range) {
+            axis.visible = false;
+            selection.visible = false;
+            return;
+        }
+
+        // (디버그) xyz축 표시
+        axis.visible = true;
+        axis.position.copy(pointingBlock.point);
+
+        // 현재 선택한 블록을 표시
+        selection.visible = true;
+        selection.position.copy(pointingBlock.coordinate);
+
+        // 현재 들고 있는 블록에 따라서 향후 로직 처리
+        if (this.equippedBlock < 0) {
+            this.handle3DModelPlacement(pointingBlock);
+        } else {
+            this.handleBlockPlacement(pointingBlock);
+        }
+    }
+
+    /**
+     * 플레이어의 3D Model 설치를 처리합니다.
+     * @param {{ point: THREE.Vector3, distance: number, coordinate: THREE.Vector3, normal: THREE.Vector3, block: Block }} pointingBlock
+     */
+    handle3DModelPlacement(pointingBlock) {
+        const normal = pointingBlock.normal;
+        const coordinate = pointingBlock.coordinate.clone().add(normal);
+
+        const previewModel = this.scene.world.previewModel;
+        const previewPosition = coordinate;
+        previewModel.setPosition(previewPosition);
+        previewModel.visible = true;
+
+        if (
+            RinInput.getPointerDown(0) ||
+            (this.blockDelay <= 0 && RinInput.getPointer(0))
+        ) {
+            // 마우스 좌클릭 - 블록 파괴
+            const x = pointingBlock.coordinate.x;
+            const y = pointingBlock.coordinate.y;
+            const z = pointingBlock.coordinate.z;
+
+            this.scene.world.setBlock(x, y, z, 0);
+
+            this.blockDelay = BLOCK_SET_DELAY;
+        }
+
+        if (
+            RinInput.getPointerDown(2) ||
+            (this.blockDelay <= 0 && RinInput.getPointer(2))
+        ) {
+            if (previewModel.isCollide === false) {
+                // 마우스 우클릭 - 블록 설치
+                previewModel.place();
+                this.blockDelay = BLOCK_SET_DELAY;
+            }
+        }
+
+        if (RinInput.getKeyDown("KeyR")) {
+            previewModel.rotate();
+        }
+    }
+
+    /**
+     * 플레이어의 복쉘 블록 설치를 처리합니다.
+     * @param {{ point: THREE.Vector3, distance: number, coordinate: THREE.Vector3, normal: THREE.Vector3, block: Block }} pointingBlock
+     * @returns
+     */
+    handleBlockPlacement(pointingBlock) {
+        if (
+            RinInput.getPointerDown(0) ||
+            (this.blockDelay <= 0 && RinInput.getPointer(0))
+        ) {
+            // 마우스 좌클릭 - 블록 파괴
+            const x = pointingBlock.coordinate.x;
+            const y = pointingBlock.coordinate.y;
+            const z = pointingBlock.coordinate.z;
+
+            this.scene.world.setBlock(x, y, z, 0);
+
+            this.blockDelay = BLOCK_SET_DELAY;
+        }
+
+        if (
+            RinInput.getPointerDown(2) ||
+            (this.blockDelay <= 0 && RinInput.getPointer(2))
+        ) {
+            // 마우스 우클릭 - 블록 설치
+            const normal = pointingBlock.normal;
+            const coordinate = pointingBlock.coordinate.clone().add(normal);
+
+            const intersects = getPlayerIntersectCoordinates(
+                this.instance.position
+            );
+
+            if (intersects.some((item) => item.equals(coordinate))) {
+                return;
+            }
+
+            const x = coordinate.x;
+            const y = coordinate.y;
+            const z = coordinate.z;
+
+            this.scene.world.setBlock(x, y, z, this.equippedBlock);
+
+            this.blockDelay = BLOCK_SET_DELAY;
+        }
+    }
+
+    /**
      * 현재 바라보고 있는 블록의 정보를 반환합니다.
-     * @returns {object | null}
+     * @returns {{ point: THREE.Vector3, distance: number, coordinate: THREE.Vector3, normal: THREE.Vector3, block: Block } | null}
      */
     getPointingBlock() {
         if (this.scene.world.mesh === null) {
             return null;
         }
-
-        // const raycaster = new THREE.Raycaster(
-        //     this.instance.position,
-        //     this.instance.getWorldDirection(new THREE.Vector3()),
-        //     0,
-        //     15
-        // );
-
-        // raycaster.setFromCamera({ x: 0, y: 0 }, this.instance);
-
-        // const intersects = raycaster.intersectObject(this.scene.world.mesh);
 
         const position = this.instance.position;
         const direction = this.instance.getWorldDirection(new THREE.Vector3());

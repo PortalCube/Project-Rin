@@ -15,6 +15,8 @@ import { RinEngine } from "../engine.js";
 import blockVertexShader from "../../assets/shaders/block.vert?raw";
 import blockFragmentShader from "../../assets/shaders/block.frag?raw";
 import { create2DNoiseFunction } from "../perlin-noise.js";
+import { Model } from "../entities/model.js";
+import { TeapotGeometry } from "three/examples/jsm/Addons.js";
 
 export class World {
     /**
@@ -43,6 +45,11 @@ export class World {
     renderCount = 0;
 
     /**
+     * @type {Model[]} 월드에 배치된 3D 모델의 배열
+     */
+    models = [];
+
+    /**
      * @type {THREE.Vector3} directional light의 방향
      */
     lightDirection = new THREE.Vector3(1, 1, 0);
@@ -57,8 +64,27 @@ export class World {
     minChunkValue = 0;
     maxChunkValue = 0;
 
+    /**
+     * @type {Model} 플레이어 미리보기 모델
+     */
+    get previewModel() {
+        return this.models[0];
+    }
+
     constructor(scene) {
         this.scene = scene;
+
+        // 예시 3D 모델을 생성
+        const geometry = new TeapotGeometry(1);
+        const previewModel = new Model(this.scene);
+
+        previewModel.index = 0;
+        previewModel.geometry = geometry;
+        previewModel.createInstance();
+        previewModel.createBoundingBox();
+        previewModel.instance.position.set(0, 45, 0);
+
+        this.models.push(previewModel);
 
         scene.addEventListener("frameUpdate", (event) =>
             this.onFrameUpdate(event.deltaTime)
@@ -66,22 +92,7 @@ export class World {
     }
 
     onFrameUpdate(deltaTime) {
-        if (this.mesh) {
-            /**
-             * @type {THREE.PerspectiveCamera}
-             */
-            const camera = this.scene.player.instance;
-            const lightDir = this.lightDirection.clone();
-
-            // camera.matrixWorld        -> camera 좌표계를  world 좌표계로 변환 행렬
-            // camera.matrixInverseWorld ->  world 좌표계를 camera 좌표계로 변환 행렬
-
-            // directional light의 방향은 world 좌표계의 방향이므로 camera 좌표계로 변환하여 사용
-            lightDir.transformDirection(camera.matrixWorldInverse);
-
-            // 갱신된 directional light의 방향을 셰이더로 넘겨주기
-            this.mesh.material.uniforms.lightDir.value = lightDir.toArray();
-        }
+        this.updateBlockLight();
     }
 
     /**
@@ -114,7 +125,7 @@ export class World {
             this.chunks.push(list);
         }
 
-        // 2. 맵 생성 알고리즘을 적용합니다. 펄린 노이즈와 프랙탈 브라운 운동을 사용하여 현실과 같은 지형을 만듧니다.
+        // 2. 맵 생성 알고리즘을 적용합니다. 펄린 노이즈를 사용하여 현실처럼 부드러운 지형을 만듧니다.
         let blockId = 0;
 
         // 펄린 노이즈 함수 생성
@@ -144,7 +155,10 @@ export class World {
             shiftY: 100000,
         });
 
+        let arr = [];
+
         for (let x = this.minWorldValue; x <= this.maxWorldValue; x++) {
+            let temp = [];
             for (let z = this.minWorldValue; z <= this.maxWorldValue; z++) {
                 // 펄린 노이즈를 사용하여 level을 결정
                 const _x = x - this.minWorldValue;
@@ -153,6 +167,7 @@ export class World {
                 const temperature = getTemperatureNoise(_x, _z);
                 const beach = getBeachNoise(_x, _z);
                 const isOcean = level < SEA_LEVEL;
+                temp.push(level);
 
                 for (let y = 0; y < this.depth; y++) {
                     if (y < 2) {
@@ -193,7 +208,10 @@ export class World {
                     this.getBlock(x, y, z).id = blockId;
                 }
             }
+            arr.push(temp);
         }
+
+        console.log(arr);
     }
 
     /**
@@ -276,7 +294,7 @@ export class World {
         // ShaderMaterial을 생성하고 blockShader, textureImage 적용
         const material = new THREE.ShaderMaterial({
             uniforms: {
-                lightDir: { value: [0.0, 0.0, 0.0] },
+                lightDir: { value: [1.0, 1.0, 0.0] },
                 lightAmbient: { value: [0.8, 0.8, 0.8, 1.0] },
                 matDiffuse: { value: [0.5, 0.5, 0.5, 1.0] },
                 matSpecular: { value: [0.3, 0.3, 0.3, 0.3] },
@@ -375,6 +393,9 @@ export class World {
         this.scene.scene.add(mesh);
         this.needRenderUpdate = false;
 
+        // 블록 라이트 업데이트
+        this.updateBlockLight();
+
         return mesh;
     }
 
@@ -404,9 +425,9 @@ export class World {
     /**
      * World의 block의 렌더링을 업데이트합니다. (내부 함수)
      * @param {Block} block
-     * @param {number} depth
+     * @param {boolean} spread
      */
-    _updateRender(block, depth = 0) {
+    _updateRender(block, spread = true) {
         const key = `${block.coordinate.x}:${block.coordinate.y}:${block.coordinate.z}`;
         const originalInfos = this.renderInfos.get(key);
 
@@ -419,11 +440,9 @@ export class World {
         // 새로운 hash 구하기
         let newHash = blockRenderInfos ? blockRenderInfos.hash : 0;
 
-        // hash가 같으면 업데이트하지 않음
-        if (oldHash === newHash) {
-            if (depth++ > 1) {
-                return false;
-            }
+        // 주변 블록의 hash가 같으면 업데이트하지 않음
+        if (spread === false && oldHash === newHash) {
+            return false;
         }
 
         // 렌더링 정보 업데이트
@@ -439,12 +458,14 @@ export class World {
         // 렌더링 정보 갯수 업데이트
         this.renderCount += newLength - oldLength;
 
-        // 인접한 블록의 렌더링 정보도 업데이트
-        for (let direction = 0; direction < 6; direction++) {
-            const nearBlock = block.getNearBlock(direction);
+        if (spread) {
+            // 인접한 블록의 렌더링 정보도 업데이트
+            for (let direction = 0; direction < 6; direction++) {
+                const nearBlock = block.getNearBlock(direction);
 
-            if (nearBlock) {
-                this._updateRender(nearBlock, depth);
+                if (nearBlock && nearBlock.active) {
+                    this._updateRender(nearBlock, false);
+                }
             }
         }
 
@@ -510,8 +531,37 @@ export class World {
         const block = this.getBlock(x, y, z);
 
         if (block) {
+            if (block.id < 0) {
+                // Model 삭제
+                this.models[-block.id].destroy();
+                return;
+            }
+
             block.id = id;
-            this.updateRender(x, y, z);
+
+            // 3D 모델이 아닌 경우, 렌더링 업데이트
+            if (id >= 0) {
+                this.updateRender(x, y, z);
+            }
+        }
+    }
+
+    /**
+     * 블록 라이트를 업데이트합니다.
+     */
+    updateBlockLight() {
+        if (this.mesh) {
+            const camera = this.scene.player.instance;
+            const lightDir = this.lightDirection.clone();
+
+            // camera.matrixWorld          camera -> world  좌표계 변환 행렬
+            // camera.matrixWorldInverse   world  -> camera 좌표계 변환 행렬
+
+            // directional light의 방향은 world 좌표계의 방향이므로 camera 좌표계로 변환하여 사용
+            lightDir.transformDirection(camera.matrixWorldInverse);
+
+            // 갱신된 directional light의 방향을 셰이더로 넘겨주기
+            this.mesh.material.uniforms.lightDir.value = lightDir.toArray();
         }
     }
 }
